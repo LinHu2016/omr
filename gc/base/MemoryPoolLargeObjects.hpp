@@ -207,7 +207,7 @@ public:
 	/**
 	 * @return the ratio of Large Object Area
 	 */
-	MMINLINE double
+	MMINLINE double 
 	getLOARatio()
 	{
 		return _currentLOARatio;
