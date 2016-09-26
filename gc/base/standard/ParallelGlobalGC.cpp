@@ -847,7 +847,8 @@ MM_ParallelGlobalGC::processLargeAllocateStatsAfterSweep(MM_EnvironmentBase *env
 
 	stats->verifyFreeEntryCount(memoryPool->getActualFreeEntryCount());
 	/* estimate Fragmentation */
-	if (GLOBALGC_ESTIMATE_FRAGMENTATION == (_extensions->estimateFragmentation & GLOBALGC_ESTIMATE_FRAGMENTATION)) {
+	if ((GLOBALGC_ESTIMATE_FRAGMENTATION == (_extensions->estimateFragmentation & GLOBALGC_ESTIMATE_FRAGMENTATION)) &&
+		_cli->isVMNotInStartupPhase(env)) {
 		stats->estimateFragmentation(env);
 	} else {
 		stats->resetRemainingFreeMemoryAfterEstimate();

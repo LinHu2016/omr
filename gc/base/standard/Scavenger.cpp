@@ -3505,7 +3505,8 @@ MM_Scavenger::processLargeAllocateStatsAfterGC(MM_EnvironmentBase *env)
 
 	stats->verifyFreeEntryCount(memoryPool->getActualFreeEntryCount());
 	/* estimate Fragmentation */
-	if (LOCALGC_ESTIMATE_FRAGMENTATION == (_extensions->estimateFragmentation & LOCALGC_ESTIMATE_FRAGMENTATION)) {
+	if ((LOCALGC_ESTIMATE_FRAGMENTATION == (_extensions->estimateFragmentation & LOCALGC_ESTIMATE_FRAGMENTATION)) &&
+		_cli->isVMNotInStartupPhase(env)) {
 		stats->estimateFragmentation(env);
 	} else {
 		stats->resetRemainingFreeMemoryAfterEstimate();
