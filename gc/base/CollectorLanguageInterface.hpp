@@ -558,6 +558,15 @@ public:
 #endif /* OMR_GC_MODRON_CONCURRENT_MARK */
 
 	/**
+	 * This method is called to check if vm is in Startup stage, return true if vm is not in Startup stage(Default).
+	 *
+	 * @param[in] env The environment for the calling thread.
+	 * @return true if vm is not in Startup stage.
+	 */
+	virtual bool isVMNotInStartupPhase(MM_EnvironmentBase *env) { return true; }
+
+
+	/**
 	 * In the absence of other (equivalent) write barrier, this method must be called
 	 * to effect the assignment of a child reference to a parent slot.
 	 *
