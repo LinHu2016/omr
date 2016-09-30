@@ -275,7 +275,9 @@ MM_ParallelGlobalGC::masterThreadGarbageCollect(MM_EnvironmentBase *env, MM_Allo
 #if defined(OMR_GC_MODRON_COMPACTION)
 	/* If a compaction was required, then do one */
 	if (_compactThisCycle) {
-		_collectionStatistics._tenureFragmentation = true;
+		_collectionStatistics._tenureMicroFragmentation = true;
+		_collectionStatistics._tenureMacroFragmentation = (GLOBALGC_ESTIMATE_FRAGMENTATION == (_extensions->estimateFragmentation & GLOBALGC_ESTIMATE_FRAGMENTATION));
+
 		masterThreadCompact(env, allocDescription, rebuildMarkBits);
 	} else {
 		/* If a compaction was prevented, report the reason */
@@ -288,7 +290,8 @@ MM_ParallelGlobalGC::masterThreadGarbageCollect(MM_EnvironmentBase *env, MM_Allo
 			compactStats->_endTime = 0;
 			reportCompactEnd(env);
 		}
-		_collectionStatistics._tenureFragmentation = true;
+		_collectionStatistics._tenureMicroFragmentation = true;
+		_collectionStatistics._tenureMacroFragmentation = (GLOBALGC_ESTIMATE_FRAGMENTATION == (_extensions->estimateFragmentation & GLOBALGC_ESTIMATE_FRAGMENTATION));
 	}
 #endif /* defined(OMR_GC_MODRON_COMPACTION) */	
 

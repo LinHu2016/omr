@@ -332,7 +332,7 @@ MM_VerboseHandlerOutputStandard::handleCompactStart(J9HookInterface** hook, uint
 	MM_VerboseWriterChain* writer = manager->getWriterChain();
 
 	MM_CollectionStatisticsStandard *stats = (MM_CollectionStatisticsStandard *)env->_cycleState->_collectionStatistics;
-	if (stats->_tenureFragmentation) {
+	if (stats->_tenureMicroFragmentation || stats->_tenureMacroFragmentation)
 		stats->collectCollectionStatistics(env, stats);
 		enterAtomicReportingBlock();
 		outputMemoryInfo(env, manager->getIndentLevel(), stats);
@@ -803,27 +803,21 @@ MM_VerboseHandlerOutputStandard::hasOutputMemoryInfoInnerStanza()
 void
 MM_VerboseHandlerOutputStandard::outputMemType(MM_EnvironmentBase* env, uintptr_t indent, const char* type, uintptr_t free, uintptr_t total, uintptr_t microFragment, uintptr_t macroFragment)
 {
+	char memInfoBuffer[INITIAL_BUFFER_SIZE];
+	memInfoBuffer[0] = 0;
+
 	MM_VerboseWriterChain* writer = _manager->getWriterChain();
 
-	writer->formatAndOutput(
-			env,
-			indent,
-			"<mem type=\"%s\" free=\"%zu\" total=\"%zu\" percent=\"%zu\" micro-fragmented=\"%zu\" macro-fragmented=\"%zu\" />",
-			type, free, total,
-			((total == 0) ? 0 : ((uintptr_t)(((uint64_t)free*100) / (uint64_t)total))), microFragment, macroFragment);
-}
-
-void
-MM_VerboseHandlerOutputStandard::outputMemType(MM_EnvironmentBase* env, uintptr_t indent, const char* type, uintptr_t free, uintptr_t total)
-{
-	MM_VerboseWriterChain* writer = _manager->getWriterChain();
-
-	writer->formatAndOutput(
-			env,
-			indent,
-			"<mem type=\"%s\" free=\"%zu\" total=\"%zu\" percent=\"%zu\" />",
-			type, free, total,
-			((total == 0) ? 0 : ((uintptr_t)(((uint64_t)free*100) / (uint64_t)total))));
+	sprintf(&memInfoBuffer[strlen[memInfoBuffer]], "<mem type=\"%s\" free=\"%zu\" total=\"%zu\" percent=\"%zu\"",
+			type, free, total, ((total == 0) ? 0 : ((uintptr_t)(((uint64_t)free*100) / (uint64_t)total))));
+	if (UINTPTR_MAX != microFragment) {
+		sprintf(&memInfoBuffer[strlen[memInfoBuffer]], " micro-fragmented=\"%zu\"", microFragment);
+	}
+	if (UINTPTR_MAX != macroFragment) {
+		sprintf(&memInfoBuffer[strlen[memInfoBuffer]], " macro-fragmented=\"%zu\"", macroFragment);
+	}
+	sprintf(&memInfoBuffer[strlen[memInfoBuffer]], ">");
+	writer->formatAndOutput(env, indent, memInfoBuffer);
 }
 
 void
@@ -842,27 +836,35 @@ MM_VerboseHandlerOutputStandard::outputMemoryInfoInnerStanza(MM_EnvironmentBase 
 		writer->formatAndOutput(env, indent, "</mem>");
 	}
 
+	char tenureMemInfoBuffer[INITIAL_BUFFER_SIZE];
+	tenureMemInfoBuffer[0] = 0;
+
 	if (stats->_loaEnabled) {
-		if (stats->_tenureFragmentation) {
-			writer->formatAndOutput(env, indent, "<mem type=\"tenure\" free=\"%zu\" total=\"%zu\" percent=\"%zu\" micro-fragmented=\"%zu\" macro-fragmented=\"%zu\">",
-				stats->_totalFreeTenureHeapSize, stats->_totalTenureHeapSize,
-				((stats->_totalTenureHeapSize == 0) ? 0 : ((uintptr_t)(((uint64_t)stats->_totalFreeTenureHeapSize*100) / (uint64_t)stats->_totalTenureHeapSize))),
-				stats->_microFragmentedSize, stats->_macroFragmentedSize);
-		} else {
-			writer->formatAndOutput(env, indent, "<mem type=\"tenure\" free=\"%zu\" total=\"%zu\" percent=\"%zu\">",
+		sprintf(&tenureMemInfoBuffer[strlen[tenureMemInfoBuffer]], "<mem type=\"tenure\" free=\"%zu\" total=\"%zu\" percent=\"%zu\"",
 				stats->_totalFreeTenureHeapSize, stats->_totalTenureHeapSize,
 				((stats->_totalTenureHeapSize == 0) ? 0 : ((uintptr_t)(((uint64_t)stats->_totalFreeTenureHeapSize*100) / (uint64_t)stats->_totalTenureHeapSize))));
+		if (stats->_tenureMicroFragmentation) {
+			sprintf(&tenureMemInfoBuffer[strlen[tenureMemInfoBuffer]], " micro-fragmented=\"%zu\"", stats->_microFragmentedSize);
 		}
+		if (stats->_tenureMacroFragmentation) {
+			sprintf(&tenureMemInfoBuffer[strlen[tenureMemInfoBuffer]], " macro-fragmented=\"%zu\"", stats->_macroFragmentedSize);
+		}
+		sprintf(&tenureMemInfoBuffer[strlen[tenureMemInfoBuffer]], ">");
+		writer->formatAndOutput(env, indent, tenureMemInfoBuffer);
 
 		outputMemType(env, indent + 1, "soa", (stats->_totalFreeTenureHeapSize - stats->_totalFreeLOAHeapSize), (stats->_totalTenureHeapSize - stats->_totalLOAHeapSize));
 		outputMemType(env, indent + 1, "loa", stats->_totalFreeLOAHeapSize, stats->_totalLOAHeapSize);
 		writer->formatAndOutput(env, indent, "</mem>");
 	} else {
-		if (stats->_tenureFragmentation) {
-			outputMemType(env, indent, "tenure", stats->_totalFreeTenureHeapSize, stats->_totalTenureHeapSize, stats->_microFragmentedSize, stats->_macroFragmentedSize);
-		} else {
-			outputMemType(env, indent, "tenure", stats->_totalFreeTenureHeapSize, stats->_totalTenureHeapSize);
+		uintptr_t microFragmentedSize = UINTPTR_MAX;
+		uintptr_t macroFragmentedSize = UINTPTR_MAX;
+		if (stats->_tenureMicroFragmentation) {
+			microFragmentedSize = stats->_microFragmentedSize;
 		}
+		if (stats->_tenureMacroFragmentation) {
+			macroFragmentedSize = stats->_macroFragmentedSize;
+		}
+		outputMemType(env, indent, "tenure", stats->_totalFreeTenureHeapSize, stats->_totalTenureHeapSize, microFragmentedSize, macroFragmentedSize);
 	}
 
 	outputMemoryInfoInnerStanzaInternal(env, indent, statsBase);
@@ -871,7 +873,8 @@ MM_VerboseHandlerOutputStandard::outputMemoryInfoInnerStanza(MM_EnvironmentBase 
 		writer->formatAndOutput(env, indent, "<remembered-set count=\"%zu\" />", stats->_rememberedSetCount);
 	}
 
-	stats->_tenureFragmentation = false;
+	stats->_tenureMicroFragmentation = false;
+	stats->_tenureMacroFragmentation = false;
 }
 
 void
