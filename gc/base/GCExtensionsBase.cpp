@@ -134,6 +134,9 @@ MM_GCExtensionsBase::initialize(MM_EnvironmentBase* env)
 		memoryToRequest = J9_PHYSICAL_MEMORY_DEFAULT;
 	}
 	memoryToRequest = OMR_MIN(memoryToRequest, J9_PHYSICAL_MEMORY_MAX);
+	/* extend default max memory to 25% of physical RAM */
+	memoryToRequest = OMR_MAX(memoryToRequest, usableMemory / 4);
+
 
 	/* Initialize Xmx, Xmdx */
 	memoryMax = MM_Math::roundToFloor(heapAlignment, (uintptr_t)memoryToRequest);
