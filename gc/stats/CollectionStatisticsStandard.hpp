@@ -52,7 +52,8 @@ public:
 	uintptr_t _totalSurvivorHeapSize; /**< Total active survivor heap size */
 	uintptr_t _totalFreeSurvivorHeapSize; /**< Total active free survivor heap size */
 	uintptr_t _rememberedSetCount; /**< remembered set count */
-	bool _tenureFragmentation;
+	bool _tenureMicroFragmentation;
+	bool _tenureMacroFragmentation;
 	uintptr_t _microFragmentedSize; /**< */
 	uintptr_t _macroFragmentedSize; /**< */
 private:
@@ -108,14 +109,16 @@ public:
 			stats->_rememberedSetCount = 0;
 		}
 
-		if (_tenureFragmentation) {
+		if (_tenureMicroFragmentation || _tenureMacroFragmentation) {
 			MM_MemorySpace *defaultMemorySpace = extensions->heap->getDefaultMemorySpace();
 			MM_MemorySubSpace *tenureMemorySubspace = defaultMemorySpace->getTenureMemorySubSpace();
-			MM_LargeObjectAllocateStats* allocateStats = tenureMemorySubspace->getLargeObjectAllocateStats();
-
-			stats->_microFragmentedSize = tenureMemorySubspace->getMemoryPool()->getDarkMatterBytes();
-			stats->_macroFragmentedSize = allocateStats->getRemainingFreeMemoryAfterEstimate();
-
+			if (_tenureMicroFragmentation) {
+				stats->_microFragmentedSize = tenureMemorySubspace->getMemoryPool()->getDarkMatterBytes();
+			}
+			if (_tenureMacroFragmentation) {
+				MM_LargeObjectAllocateStats* allocateStats = tenureMemorySubspace->getLargeObjectAllocateStats();
+				stats->_macroFragmentedSize = allocateStats->getRemainingFreeMemoryAfterEstimate();
+			}
 		} else {
 			stats->_microFragmentedSize = 0;
 			stats->_macroFragmentedSize = 0;
@@ -152,7 +155,8 @@ public:
 		,_totalSurvivorHeapSize(0)
 		,_totalFreeSurvivorHeapSize(0)
 		,_rememberedSetCount(0)
-		, _tenureFragmentation(false)
+		, _tenureMicroFragmentation(false)
+		, _tenureMacroFragmentation(false)
 		, _microFragmentedSize(0)
 		, _macroFragmentedSize(0)
 	{};

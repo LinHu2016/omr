@@ -19,6 +19,7 @@
 #if !defined(VERBOSEHANDLEROUTPUTSTANDARD_HPP_)
 #define VERBOSEHANDLEROUTPUTSTANDARD_HPP_
 
+#include <stdint.h>
 #include "omrcfg.h"
 #include "omrcomp.h"
 
@@ -36,8 +37,7 @@ public:
 private:
 
 protected:
-	void outputMemType(MM_EnvironmentBase* env, uintptr_t indent, const char* type, uintptr_t free, uintptr_t total);
-	void outputMemType(MM_EnvironmentBase* env, uintptr_t indent, const char* type, uintptr_t free, uintptr_t total, uintptr_t microFragment, uintptr_t macroFragment);
+	void outputMemType(MM_EnvironmentBase* env, uintptr_t indent, const char* type, uintptr_t free, uintptr_t total, uintptr_t microFragment=UDATA_MAX, uintptr_t macroFragment=UDATA_MAX);
 	virtual bool initialize(MM_EnvironmentBase *env, MM_VerboseManager *manager);
 	virtual void tearDown(MM_EnvironmentBase *env);
 
