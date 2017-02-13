@@ -16,3 +16,4 @@
 #    Multiple authors (IBM Corp.) - initial implementation and documentation
 ###############################################################################
 J9HookInitializeInterface
+omrhook_lib_control

@@ -24,11 +24,14 @@
 #include "omrmemcategories.h"
 #include "omrutil.h"
 #include "AtomicSupport.hpp"
+#include "ut_j9hook.h"
+#include "omrtrace.h"
 
 extern "C" {
 
 static void J9HookUnregister(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum, J9HookFunction function, void *userData);
 static intptr_t J9HookRegister(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum, J9HookFunction function, void *userData, ...);
+static intptr_t J9HookRegisterWithCallSite(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum, J9HookFunction function, const char *callsite, void *userData, ...);
 static void J9HookShutdownInterface(struct J9HookInterface **hookInterface);
 static intptr_t J9HookDisable(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum);
 static intptr_t J9HookIsEnabled(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum);
@@ -42,6 +45,7 @@ static J9CONST_TABLE J9HookInterface hookFunctionTable = {
 	J9HookDisable,
 	J9HookReserve,
 	J9HookRegister,
+	J9HookRegisterWithCallSite,
 	J9HookUnregister,
 	J9HookShutdownInterface,
 	J9HookIsEnabled,
@@ -78,6 +82,28 @@ static J9CONST_TABLE J9HookInterface hookFunctionTable = {
 #define HOOK_INVALID_ID(id) ((id) | 1)
 #define HOOK_VALID_ID(id) ( (((id) | 1) + 1) )
 
+
+intptr_t
+omrhook_lib_control(const char *key, uintptr_t value)
+{
+	intptr_t rc = -1;
+
+	if (0 != value) {
+#if defined(OMR_RAS_TDF_TRACE)
+		/* return value of 0 is success */
+		if (0 == strcmp(J9HOOK_LIB_CONTROL_TRACE_START, key)) {
+			UtInterface *utIntf = (UtInterface *)value;
+			UT_MODULE_LOADED(utIntf);
+			rc = 0;
+		} else if (0 == strcmp(J9HOOK_LIB_CONTROL_TRACE_STOP, key)) {
+			UtInterface *utIntf = (UtInterface *)value;
+			UT_MODULE_UNLOADED(utIntf);
+			rc = 0;
+		}
+#endif
+	}
+	return rc;
+}
 /*
  * Prepares the specified hook interface for first use.
  *
@@ -108,10 +134,11 @@ J9HookInitializeInterface(struct J9HookInterface **hookInterface, OMRPortLibrary
 	}
 
 	commonInterface->nextAgentID = J9HOOK_AGENTID_DEFAULT + 1;
+	commonInterface->portLib = portLib;
+	commonInterface->threshold4Trace = DEFAULT_THRESHOLD_IN_MILLISECONDS_WARNNING_CALLBACK_ELAPSED_TIME * 1000;
 
 	return 0;
 }
-
 
 /*
  * Shuts down the specified hook interface.
@@ -182,7 +209,32 @@ J9HookDispatch(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum,
 			/* now read the id again to make sure that nothing has changed */
 			VM_AtomicSupport::readBarrier();
 			if (record->id == id) {
+				uint64_t timeDelta = 0;
+				OMRPORT_ACCESS_FROM_OMRPORT(commonInterface->portLib);
+				uint64_t startTime = omrtime_hires_clock();
 				function(hookInterface, eventNum, eventData, userData);
+				timeDelta = omrtime_hires_delta(startTime, omrtime_hires_clock(), OMRPORT_TIME_DELTA_IN_MICROSECONDS);
+				EventInfo4Dump *eventDump = NULL;
+				if (NULL != commonInterface->infos4Dump) {
+					eventDump = &commonInterface->infos4Dump[eventNum];
+				}
+				if (NULL != eventDump) {
+					eventDump->lastHook.callsite = (NULL != record->callsite)?record->callsite:"UNKNOWN";
+					eventDump->lastHook.startTime = startTime;
+					eventDump->lastHook.duration = timeDelta;
+					if (eventDump->longestHook.duration < eventDump->lastHook.duration) {
+						eventDump->longestHook.callsite = eventDump->lastHook.callsite;
+						eventDump->longestHook.startTime = eventDump->lastHook.startTime;
+						eventDump->longestHook.duration = eventDump->lastHook.duration;
+					}
+				}
+				if (commonInterface->threshold4Trace <= timeDelta) {
+					const char *callsite = "UNKNOWN";
+					if (NULL != record->callsite) {
+						callsite = record->callsite;
+					}
+					Trc_Hook_Dispatch_Exceed_Threshold_Event(callsite, timeDelta/1000);
+				}
 			} else {
 				/* this record has been updated while we were reading it. Skip it. */
 			}
@@ -342,6 +394,7 @@ J9HookRegister(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum,
 					(emptyRecord->next->agentID >= agentID)))
 		) {
 			emptyRecord->function = function;
+			emptyRecord->callsite = NULL;
 			emptyRecord->userData = userData;
 			emptyRecord->count = 1;
 			emptyRecord->agentID = agentID;
@@ -362,6 +415,115 @@ J9HookRegister(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum,
 					record->next = insertionPoint->next;
 				}
 				record->function = function;
+				record->callsite = NULL;
+				record->userData = userData;
+				record->count = 1;
+				record->id = HOOK_INITIAL_ID;
+				record->agentID = agentID;
+
+				VM_AtomicSupport::writeBarrier();
+
+				if (insertionPoint == NULL) {
+					HOOK_RECORD(commonInterface, eventNum) = record;
+				} else {
+					insertionPoint->next = record;
+				}
+
+				HOOK_FLAGS(commonInterface, eventNum) |= J9HOOK_FLAG_HOOKED | J9HOOK_FLAG_RESERVED;
+			}
+		}
+	}
+
+	omrthread_monitor_exit(commonInterface->lock);
+
+	/* report the registration event */
+	eventStruct.eventNum = eventNum;
+	eventStruct.function = function;
+	eventStruct.userData = userData;
+	eventStruct.isRegistration = 1;
+	eventStruct.agentID = agentID;
+	(*hookInterface)->J9HookDispatch(hookInterface, J9HOOK_REGISTRATION_EVENT, &eventStruct);
+
+	return rc;
+}
+
+static intptr_t
+J9HookRegisterWithCallSite(struct J9HookInterface **hookInterface, uintptr_t taggedEventNum, J9HookFunction function, const char *callsite, void *userData, ...)
+{
+	J9CommonHookInterface *commonInterface = (J9CommonHookInterface *)hookInterface;
+	J9HookRegistrationEvent eventStruct;
+	intptr_t rc = 0;
+	uintptr_t eventNum = taggedEventNum & J9HOOK_EVENT_NUM_MASK;
+	uintptr_t agentID = J9HOOK_AGENTID_DEFAULT;
+
+	if (taggedEventNum & J9HOOK_TAG_AGENT_ID) {
+		va_list args;
+
+		va_start(args, userData);
+		agentID = va_arg(args, uintptr_t);
+		va_end(args);
+	}
+
+	omrthread_monitor_enter(commonInterface->lock);
+
+	if (HOOK_FLAGS(commonInterface, eventNum) & J9HOOK_FLAG_DISABLED) {
+		rc = -1;
+	} else {
+		J9HookRecord *insertionPoint = NULL;
+		J9HookRecord *emptyRecord = NULL;
+		J9HookRecord *record = HOOK_RECORD(commonInterface, eventNum);
+		/* at the end of the loop, insertionPoint will point to the last record which should be triggered before the one we're adding */
+		while (record) {
+			if ((taggedEventNum & J9HOOK_TAG_REVERSE_ORDER) ? record->agentID >= agentID : record->agentID <= agentID) {
+				insertionPoint = record;
+			}
+			if (!HOOK_IS_VALID_ID(record->id)) {
+				if ((taggedEventNum & J9HOOK_TAG_REVERSE_ORDER) ? record->agentID >= agentID : record->agentID <= agentID) {
+					emptyRecord = record;
+				}
+			} else if ((record->function == function) && (record->userData == userData)) {
+				/* this listener is already registered */
+				++(record->count);
+				omrthread_monitor_exit(commonInterface->lock);
+				return 0;
+			}
+			record = record->next;
+		}
+
+		/*
+		 * Re-use the empty record if it is in a legitimate position for the requested agent.
+		 * (It is a legitimate position if all records before this position have the same or lower agent IDs (tested previously)
+		 * and all records after this position have the same or higher IDs)
+		 */
+		if ((emptyRecord != NULL)
+			&& ((emptyRecord->next == NULL)
+				|| ((taggedEventNum & J9HOOK_TAG_REVERSE_ORDER) ?
+					(emptyRecord->next->agentID <= agentID) :
+					(emptyRecord->next->agentID >= agentID)))
+		) {
+			emptyRecord->function = function;
+			emptyRecord->callsite = callsite;
+			emptyRecord->userData = userData;
+			emptyRecord->count = 1;
+			emptyRecord->agentID = agentID;
+
+			VM_AtomicSupport::writeBarrier();
+
+			emptyRecord->id = HOOK_VALID_ID(emptyRecord->id);
+
+			HOOK_FLAGS(commonInterface, eventNum) |= J9HOOK_FLAG_HOOKED | J9HOOK_FLAG_RESERVED;
+		} else {
+			record = (J9HookRecord *)pool_newElement(commonInterface->pool);
+			if (record == NULL) {
+				rc = -1;
+			} else {
+				if (insertionPoint == NULL) {
+					record->next = HOOK_RECORD(commonInterface, eventNum);
+				} else {
+					record->next = insertionPoint->next;
+				}
+				record->function = function;
+				record->callsite = callsite;
 				record->userData = userData;
 				record->count = 1;
 				record->id = HOOK_INITIAL_ID;

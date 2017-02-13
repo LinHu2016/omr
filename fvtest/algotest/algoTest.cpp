@@ -22,6 +22,10 @@
 #include "omrTest.h"
 #include "testEnvironment.hpp"
 
+#include "omrrasinit.h"
+#include "omrTestHelpers.h"
+#include "omrvm.h"
+
 extern PortEnvironment *omrTestEnv;
 
 static void showResult(OMRPortLibrary *portlib, uintptr_t passCount, uintptr_t failCount, int32_t numSuitesNotRun);
@@ -74,6 +78,32 @@ TEST(OmrAlgoTest, hookabletest)
 		numSuitesNotRun++;
 	}
 	showResult(omrTestEnv->getPortLibrary(), passCount, failCount, numSuitesNotRun);
+}
+
+TEST(OmrAlgoTest, hookabletracetest)
+{
+	/* OMR VM data structures */
+	OMRTestVM testVM;
+	OMR_VMThread *vmthread = NULL;
+
+	OMRPORT_ACCESS_FROM_OMRPORT(omrTestEnv->getPortLibrary());
+	char *datDir = getTraceDatDir(omrTestEnv->_argc, (const char **)omrTestEnv->_argv);
+	OMRTEST_ASSERT_ERROR_NONE(omrTestVMInit(&testVM, OMRPORTLIB));
+
+	OMRTEST_ASSERT_ERROR_NONE(omr_ras_initTraceEngine(&testVM.omrVM, "print=j9hook", datDir));
+
+	OMRTEST_ASSERT_ERROR_NONE(OMR_Thread_Init(&testVM.omrVM, NULL, &vmthread, "j9hooktraceTest"));
+
+	if (verifyHookableTrace(omrTestEnv->getPortLibrary(), &passCount, &failCount)) {
+		numSuitesNotRun++;
+	}
+
+	OMRTEST_ASSERT_ERROR_NONE(omr_ras_cleanupTraceEngine(vmthread));
+
+	OMRTEST_ASSERT_ERROR_NONE(OMR_Thread_Free(vmthread));
+
+	/* Now clear up the VM we started for this test case. */
+	OMRTEST_ASSERT_ERROR_NONE(omrTestVMFini(&testVM));
 }
 
 TEST(OmrAlgoTest, hashtabletest)

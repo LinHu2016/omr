@@ -131,6 +131,7 @@ HookGen::completePrivateHeader(const char *structName)
 		fprintf(_privateFile, "typedef struct %s {\n", structName);
 		fprintf(_privateFile, "\tstruct J9CommonHookInterface common;\n");
 		fprintf(_privateFile, "\tU_8 flags[%d];\n", _eventNum);
+		fprintf(_privateFile, "\tstruct EventInfo4Dump infos4Dump[%d];\n", _eventNum);
 		fprintf(_privateFile, "\tJ9HookRecord* hooks[%d];\n", _eventNum);
 		fprintf(_privateFile, "} %s;\n", structName);
 		fprintf(_privateFile, "\n");

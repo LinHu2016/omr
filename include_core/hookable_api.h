@@ -35,9 +35,9 @@ extern "C" {
 #endif
 
 /* ---------------- hookable.c ---------------- */
-
 struct OMRPortLibrary;
 struct J9HookInterface;
+
 /**
 * @brief
 * @param hookInterface

@@ -707,11 +707,11 @@ MM_ConcurrentGC::initialize(MM_EnvironmentBase *env)
 #endif /* OMR_GC_LARGE_OBJECT_AREA) */
 
 	/* Register on any hook we are interested in */
-	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_CARD_CLEANING_PASS_2_START, hookCardCleanPass2Start, (void *)this);
+	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_CARD_CLEANING_PASS_2_START, hookCardCleanPass2Start, OMR_GET_CALLSITE(), (void *)this);
 
 #if defined(OMR_GC_MODRON_SCAVENGER)
 	/* attach to the hooks for objects removed from the remembered set */
-	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_OBJECT_REMOVED_FROM_REMEMBERED_SET, hookObjectRemovedFromRememberedSet, this);
+	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_OBJECT_REMOVED_FROM_REMEMBERED_SET, hookObjectRemovedFromRememberedSet, OMR_GET_CALLSITE(), this);
 #endif /* OMR_GC_MODRON_SCAVENGER */
 
 	return true;

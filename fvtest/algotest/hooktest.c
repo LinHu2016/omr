@@ -18,6 +18,7 @@
 
 
 #include <string.h>
+#include <stdio.h>
 #include "omrport.h"
 #include "hookable_api.h"
 #include "hooksample_internal.h"
@@ -50,6 +51,7 @@ verifyHookable(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *failCou
 		(*failCount)++;
 		rc = -1;
 	} else {
+		INITIALIZE_HOOKDUMP(sampleHookInterface);
 		(*passCount)++;
 		rc = testHookInterface(portLib, passCount, failCount, hookInterface);
 
@@ -59,6 +61,45 @@ verifyHookable(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *failCou
 	omrtty_printf("Finished testing hookable interface.\n");
 
 	return rc;
+}
+
+int32_t
+verifyHookableTrace(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *failCount)
+{
+	int32_t rc = 0;
+	J9HookInterface **hookInterface = J9_HOOK_INTERFACE(sampleHookInterface);
+	OMRPORT_ACCESS_FROM_OMRPORT(portLib);
+
+	omrtty_printf("Testing hookable trace...\n");
+
+	if (J9HookInitializeInterface(hookInterface, portLib, sizeof(sampleHookInterface))) {
+		(*failCount)++;
+		rc = -1;
+	} else {
+		INITIALIZE_HOOKDUMP(sampleHookInterface);
+		rc = testHookTrace(portLib, passCount, failCount, hookInterface);
+
+		(*hookInterface)->J9HookShutdownInterface(hookInterface);
+	}
+
+	omrtty_printf("Finished testing hookable trace.\n");
+	return rc;
+
+}
+
+static int32_t
+testHookTrace(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *failCount, J9HookInterface **hookInterface)
+{
+	OMRPORT_ACCESS_FROM_OMRPORT(portLib);
+	if (((*hookInterface)->J9HookRegisterWithCallSite(hookInterface, TESTHOOK_EVENT5, hookNormalEvent, OMR_GET_CALLSITE(), NULL) == 0) == (expectedResult == 0)) {
+
+		testDispatch(portLib, passCount, failCount, TESTHOOK_EVENT5, 0);
+
+		(*hookInterface)->J9HookUnregister(hookInterface, event, hookNormalEvent, NULL);
+	} else {
+		(*failCount)++;
+	}
+
 }
 
 static int32_t
@@ -208,10 +249,10 @@ testRegister(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *failCount
 {
 	OMRPORT_ACCESS_FROM_OMRPORT(portLib);
 
-	if (((*hookInterface)->J9HookRegister(hookInterface, event, hookNormalEvent, NULL) == 0) == (expectedResult == 0)) {
+	if (((*hookInterface)->J9HookRegisterWithCallSite(hookInterface, event, hookNormalEvent, OMR_GET_CALLSITE(), NULL) == 0) == (expectedResult == 0)) {
 		(*passCount)++;
 	} else {
-		omrtty_printf("J9HookRegister for 0x%zx %s. It should have %s.\n", event, (expectedResult ? "succeeded" : "failed"), (expectedResult ? "failed" : "succeeded"));
+		omrtty_printf("J9HookRegisterWithCallSite for 0x%zx %s. It should have %s.\n", event, (expectedResult ? "succeeded" : "failed"), (expectedResult ? "failed" : "succeeded"));
 		(*failCount)++;
 	}
 }
@@ -221,10 +262,10 @@ testRegisterWithAgent(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *
 {
 	OMRPORT_ACCESS_FROM_OMRPORT(portLib);
 
-	if (((*hookInterface)->J9HookRegister(hookInterface, event | J9HOOK_TAG_AGENT_ID, hookOrderedEvent, (void *)userData, agentID) == 0) == (expectedResult == 0)) {
+	if (((*hookInterface)->J9HookRegisterWithCallSite(hookInterface, event | J9HOOK_TAG_AGENT_ID, hookOrderedEvent, OMR_GET_CALLSITE(), (void *)userData, agentID) == 0) == (expectedResult == 0)) {
 		(*passCount)++;
 	} else {
-		omrtty_printf("J9HookRegister for 0x%zx %s. It should have %s.\n", event, (expectedResult ? "succeeded" : "failed"), (expectedResult ? "failed" : "succeeded"));
+		omrtty_printf("J9HookRegisterWithCallSite for 0x%zx %s. It should have %s.\n", event, (expectedResult ? "succeeded" : "failed"), (expectedResult ? "failed" : "succeeded"));
 		(*failCount)++;
 	}
 }
@@ -278,6 +319,9 @@ testDispatch(OMRPortLibrary *portLib, uintptr_t *passCount, uintptr_t *failCount
 	case TESTHOOK_EVENT4:
 		TRIGGER_TESTHOOK_EVENT4(sampleHookInterface, 4, 5, 6, count, -1);
 		break;
+	case TESTHOOK_EVENT5:
+		TRIGGER_TESTHOOK_EVENT5(sampleHookInterface, count);
+		break;
 	}
 
 	if (count == expectedResult) {
@@ -311,6 +355,19 @@ hookNormalEvent(J9HookInterface **hook, uintptr_t eventNum, void *voidEventData,
 	case TESTHOOK_EVENT4:
 		((TestHookEvent4 *)voidEventData)->count += increment;
 		break;
+	case TESTHOOK_EVENT5:
+		((TestHookEvent5 *)voidEventData)->count += increment;
+		/*
+		 * For Testing if callback function trigger tracepoint when it exceeds the threshold
+		 * Sleep for 0.2 sec to trigger the tracepoint
+		 */
+#ifdef WIN32
+		Sleep(200);
+#else
+		usleep(200000);
+#endif
+		break;
+
 	}
 
 }

@@ -37,7 +37,11 @@ extern "C" {
 /* derives the common interface pointer from a module-specific hook interface */
 #define J9_HOOK_INTERFACE(interface) (&(interface).common.hookInterface)
 
+#define J9HOOK_LIB_CONTROL_TRACE_START "trace_start"
+#define J9HOOK_LIB_CONTROL_TRACE_STOP "trace_stop"
 
+intptr_t
+omrhook_lib_control(const char *key, uintptr_t value);
 
 struct J9HookInterface; /* Forward struct declaration */
 typedef void (*J9HookFunction)(struct J9HookInterface **hookInterface, uintptr_t eventNum, void *eventData, void *userData); /* Forward struct declaration */
@@ -46,6 +50,7 @@ typedef struct J9HookInterface {
 	intptr_t (*J9HookDisable)(struct J9HookInterface **hookInterface, uintptr_t eventNum);
 	intptr_t (*J9HookReserve)(struct J9HookInterface **hookInterface, uintptr_t eventNum);
 	intptr_t (*J9HookRegister)(struct J9HookInterface **hookInterface, uintptr_t eventNum, J9HookFunction function, void *userData, ...);
+	intptr_t (*J9HookRegisterWithCallSite)(struct J9HookInterface **hookInterface, uintptr_t eventNum, J9HookFunction function, const char *callsite, void *userData, ...);
 	void (*J9HookUnregister)(struct J9HookInterface **hookInterface, uintptr_t eventNum, J9HookFunction function, void *userData);
 	void (*J9HookShutdownInterface)(struct J9HookInterface **hookInterface);
 	intptr_t (*J9HookIsEnabled)(struct J9HookInterface **hookInterface, uintptr_t eventNum);
@@ -65,12 +70,33 @@ typedef struct J9HookInterface {
 #define J9HOOK_AGENTID_DEFAULT  ((uintptr_t)1)
 #define J9HOOK_AGENTID_LAST  ((uintptr_t)-1)
 
+/* time threshold (=100 milliseconds) for triggering the tracepoint  */
+#define DEFAULT_THRESHOLD_IN_MILLISECONDS_WARNNING_CALLBACK_ELAPSED_TIME	100
+
+/* for generating Hook dump section */
+#define INITIALIZE_HOOKDUMP(interface) {interface.common.eventSize = sizeof(interface.flags) / sizeof(interface.flags[0]); interface.common.infos4Dump = &interface.infos4Dump[0];}
+
+typedef struct HookInfo4Dump {
+	const char *callsite;
+	uint64_t startTime;
+	uint64_t duration;
+}HookInfo4Dump;
+
+typedef struct EventInfo4Dump {
+	struct HookInfo4Dump longestHook;
+	struct HookInfo4Dump lastHook;
+}EventInfo4Dump;
+
 typedef struct J9CommonHookInterface {
 	struct J9HookInterface *hookInterface;
 	uintptr_t size;
 	omrthread_monitor_t lock;
 	struct J9Pool *pool;
 	uintptr_t nextAgentID;
+	struct OMRPortLibrary *portLib;
+	uint64_t threshold4Trace;
+	uintptr_t eventSize;
+	struct EventInfo4Dump *infos4Dump;
 } J9CommonHookInterface;
 
 
@@ -82,6 +108,7 @@ typedef struct J9CommonHookInterface {
 typedef struct J9HookRecord {
 	struct J9HookRecord *next;
 	J9HookFunction function;
+	const char *callsite;
 	void *userData;
 	uintptr_t count;
 	uintptr_t id;

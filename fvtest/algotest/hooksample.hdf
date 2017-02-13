@@ -61,5 +61,12 @@
 		<data type="intptr_t" name="prevAgent" description="the previous agent which saw this event"/>
 	</event>
 
+	<event>
+		<name>TESTHOOK_EVENT5</name>
+		<description>Event 5</description>
+		<struct>TestHookEvent5</struct>
+		<data type="uintptr_t" name="count" return="true" description="how many listeners received this" />
+	</event>
+
 </interface>
 

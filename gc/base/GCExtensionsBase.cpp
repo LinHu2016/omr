@@ -182,10 +182,12 @@ MM_GCExtensionsBase::initialize(MM_EnvironmentBase* env)
 	if (J9HookInitializeInterface(getPrivateHookInterface(), OMRPORTLIB, sizeof(privateHookInterface))) {
 		goto failed;
 	}
+	INITIALIZE_HOOKDUMP(privateHookInterface);
 
 	if (J9HookInitializeInterface(getOmrHookInterface(), OMRPORTLIB, sizeof(omrHookInterface))) {
 		goto failed;
 	}
+	INITIALIZE_HOOKDUMP(omrHookInterface);
 
 	if (omrthread_monitor_init_with_name(&gcExclusiveAccessMutex, 0, "GCExtensions::gcExclusiveAccessMutex")) {
 		goto failed;
