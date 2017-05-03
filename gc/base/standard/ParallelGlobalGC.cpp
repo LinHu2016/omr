@@ -144,16 +144,16 @@ MM_ParallelGlobalGC::initialize(MM_EnvironmentBase *env)
 	/* Attach to hooks required by the global collector's
 	 * heap resize (expand/contraction) functions
 	 */
-	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_ALLOCATION_FAILURE_CYCLE_START, globalGCHookAFCycleStart, OMR_GET_CALLSITE(), NULL);
-	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_ALLOCATION_FAILURE_CYCLE_END, globalGCHookAFCycleEnd, OMR_GET_CALLSITE(), NULL);
+	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_ALLOCATION_FAILURE_CYCLE_START, globalGCHookAFCycleStart, NULL);
+	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_ALLOCATION_FAILURE_CYCLE_END, globalGCHookAFCycleEnd, NULL);
 	 
 #if defined(OMR_GC_MODRON_CONCURRENT_MARK)
-	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_CONCURRENT_COLLECTION_START, globalGCHookCCStart, OMR_GET_CALLSITE(), NULL);
-	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_CONCURRENT_COLLECTION_END, globalGCHookCCEnd, OMR_GET_CALLSITE(), NULL);
+	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_CONCURRENT_COLLECTION_START, globalGCHookCCStart, NULL);
+	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_CONCURRENT_COLLECTION_END, globalGCHookCCEnd, NULL);
 #endif /* OMR_GC_MODRON_CONCURRENT_MARK */
 
-	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_SYSTEM_GC_START, globalGCHookSysStart, OMR_GET_CALLSITE(), NULL);
-	(*mmPrivateHooks)->J9HookRegisterWithCallSite(mmPrivateHooks, J9HOOK_MM_PRIVATE_SYSTEM_GC_END, globalGCHookSysEnd, OMR_GET_CALLSITE(), NULL);
+	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_SYSTEM_GC_START, globalGCHookSysStart, NULL);
+	(*mmPrivateHooks)->J9HookRegister(mmPrivateHooks, J9HOOK_MM_PRIVATE_SYSTEM_GC_END, globalGCHookSysEnd, NULL);
 
 	_cli->parallelGlobalGC_collectorInitialized(env);
 
