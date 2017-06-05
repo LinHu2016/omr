@@ -25,9 +25,9 @@
 
 #include <string.h>
 
-MM_VerboseWriterFileLoggingBuffered::MM_VerboseWriterFileLoggingBuffered(MM_EnvironmentBase *env, MM_VerboseManager *manager)
+MM_VerboseWriterFileLoggingBuffered::MM_VerboseWriterFileLoggingBuffered(MM_EnvironmentBase *env, MM_VerboseManager *manager, uintptr_t bufferSize)
 	:MM_VerboseWriterFileLogging(env, manager, VERBOSE_WRITER_FILE_LOGGING_BUFFERED)
-	,_logFileStream(NULL)
+	,_logFileStream(NULL), _streamBufferSize(bufferSize)
 {
 	/* No implementation */
 }
@@ -43,7 +43,7 @@ MM_VerboseWriterFileLoggingBuffered::newInstance(MM_EnvironmentBase *env, MM_Ver
 	
 	MM_VerboseWriterFileLoggingBuffered *agent = (MM_VerboseWriterFileLoggingBuffered *)extensions->getForge()->allocate(sizeof(MM_VerboseWriterFileLoggingBuffered), MM_AllocationCategory::DIAGNOSTIC, OMR_GET_CALLSITE());
 	if(agent) {
-		new(agent) MM_VerboseWriterFileLoggingBuffered(env, manager);
+		new(agent) MM_VerboseWriterFileLoggingBuffered(env, manager, extensions->bufferedLoggingSize);
 		if(!agent->initialize(env, filename, numFiles, numCycles)) {
 			agent->kill(env);
 			agent = NULL;
@@ -112,6 +112,7 @@ MM_VerboseWriterFileLoggingBuffered::openFile(MM_EnvironmentBase *env)
 
 	extensions->getForge()->free(filenameToOpen);
 	
+	omrfilestream_setbuffer(_logFileStream, NULL, OMRPORT_FILESTREAM_FULL_BUFFERING, _streamBufferSize);
 	omrfilestream_printf(_logFileStream, getHeader(env), version);
 	
 	return true;
