@@ -475,6 +475,10 @@ MM_ParallelGlobalGC::masterThreadGarbageCollect(MM_EnvironmentBase *env, MM_Allo
 		/* Done doing GC, reset the category back to the old one */
 		omrthread_set_category(env->getOmrVMThread()->_os_thread, 0, J9THREAD_TYPE_SET_GC);
 	}
+
+	/* for directmemory test only */
+	omrthread_sleep(255);
+
 }
 
 #if defined(OMR_GC_MODRON_COMPACTION)
