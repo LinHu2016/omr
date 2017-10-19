@@ -39,6 +39,7 @@ public:
 protected:
 private:
 	OMRFileStream *_logFileStream; /**< the filestream being written to */
+	uintptr_t _streamBufferSize;
 
 	/*
 	 * Function members
@@ -49,7 +50,7 @@ public:
 	virtual void outputString(MM_EnvironmentBase *env, const char* string);
 
 protected:
-	MM_VerboseWriterFileLoggingBuffered(MM_EnvironmentBase *env, MM_VerboseManager *manager);
+	MM_VerboseWriterFileLoggingBuffered(MM_EnvironmentBase *env, MM_VerboseManager *manager, uintptr_t bufferSize);
 
 	virtual bool initialize(MM_EnvironmentBase *env, const char *filename, uintptr_t numFiles, uintptr_t numCycles);
 
