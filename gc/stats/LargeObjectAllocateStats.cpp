@@ -1509,10 +1509,16 @@ MM_LargeObjectAllocateStats::incrementFreeEntrySizeClassStats(uintptr_t freeEntr
 }
 
 void
-MM_LargeObjectAllocateStats::incrementTlhAllocSizeClassStats(uintptr_t freeEntrySize)
+MM_LargeObjectAllocateStats::incrementTlhAllocSizeClassStats(MM_EnvironmentBase *env, uintptr_t freeEntrySize)
 {
 #if defined(OMR_GC_THREAD_LOCAL_HEAP)
 	uintptr_t sizeClassIndex = getSizeClassIndex(freeEntrySize);
+	if (sizeClassIndex >= _tlhAllocSizeClassStats._maxSizeClasses) {
+		OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+		MM_GCExtensionsBase *ext = env->getExtensions();
+		omrtty_printf("incrementTlhAllocSizeClassStats  freeEntrySize=%zu, sizeClassIndex=%zu, _tlhAllocSizeClassStats._maxSizeClasses=%zu, _tlhMaximumSize=%zu, ex->tlhMaximumSize=%zu, ex->tlhMinimumSize=%zu, ext->scavengerScanCacheMaximumSize=%zu\n",
+				freeEntrySize, sizeClassIndex, _tlhAllocSizeClassStats._maxSizeClasses, _tlhMaximumSize, ext->tlhMaximumSize, ext->tlhMinimumSize, ext->scavengerScanCacheMaximumSize);
+	}
 	Assert_MM_true(sizeClassIndex < _tlhAllocSizeClassStats._maxSizeClasses);
 	_tlhAllocSizeClassStats._count[sizeClassIndex] += 1;
 #endif

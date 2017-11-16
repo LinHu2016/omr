@@ -357,7 +357,7 @@ retry:
 	_allocBytes += consumedSize;
 	/* Collector TLH allocate stats for Survivor are not interesting (_largeObjectCollectorAllocateStatsForFreeList is null for Survivor) */
 	if (NULL != largeObjectAllocateStatsForFreeList) {
-		largeObjectAllocateStatsForFreeList[curFreeList].incrementTlhAllocSizeClassStats(consumedSize);
+		largeObjectAllocateStatsForFreeList[curFreeList].incrementTlhAllocSizeClassStats(env, consumedSize);
 	}
 
 	addrBase = (void*)freeEntry;

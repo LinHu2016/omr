@@ -313,7 +313,7 @@ public:
 	uintptr_t incrementFreeEntrySizeClassStats(uintptr_t freeEntrySize, MM_FreeEntrySizeClassStats *freeEntrySizeClassStats, uintptr_t count);
 	void decrementFreeEntrySizeClassStats(uintptr_t freeEntrySize);
 	void decrementFreeEntrySizeClassStats(uintptr_t freeEntrySize, MM_FreeEntrySizeClassStats *inFreeEntrySizeClassStats, uintptr_t count);
-	void incrementTlhAllocSizeClassStats(uintptr_t freeEntrySize);
+	void incrementTlhAllocSizeClassStats(MM_EnvironmentBase *env, uintptr_t freeEntrySize);
 
 	uint64_t getTimeEstimateFragmentation() { return _timeEstimateFragmentation; }
 	uint64_t getCPUTimeEstimateFragmentation() { return _cpuTimeEstimateFragmentation; }
