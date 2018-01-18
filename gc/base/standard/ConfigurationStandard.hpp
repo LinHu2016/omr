@@ -54,7 +54,8 @@ protected:
 	bool createSweepPoolManagerHybrid(MM_EnvironmentBase* env);
 
 	static const uintptr_t STANDARD_REGION_SIZE_BYTES = 64 * 1024;
-	static const uintptr_t STANDARD_ARRAYLET_LEAF_SIZE_BYTES = UDATA_MAX;
+//	static const uintptr_t STANDARD_ARRAYLET_LEAF_SIZE_BYTES = UDATA_MAX;
+	static const uintptr_t STANDARD_ARRAYLET_LEAF_SIZE_BYTES = 8 * 1024 * 1024;
 
 private:
 
