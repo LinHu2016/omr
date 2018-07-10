@@ -659,6 +659,7 @@ public:
 	uintptr_t tarokGMPIntermission; /** The delay between GMP cycles, specified as the number of GMP increments to skip */
 	bool tarokAutomaticGMPIntermission; /** Should the delay between GMP cycles be automatic, or as specified in tarokGMPIntermission? */
 	uintptr_t tarokRegionMaxAge; /**< Maximum age a region can be before it will no longer have its age incremented after a PGC (saturating age) */
+	uintptr_t tarokKickoffHeadroomRegionCount; /**< Count of extra regions reserved for survivor set, in case of sudden changes of survivor rate. Used in calculation to predict GMP kickoff */
 	uintptr_t tarokKickoffHeadroomInBytes; /**< extra bytes reserved for survivor set, in case of sudden changes of survivor rate. Used in calculation to predict GMP kickoff */
 	bool 	  tarokForceKickoffHeadroomInBytes; /** true if user specifies tarokKickoffHeadroomInBytes via -XXgc:tarokKickoffHeadroomInBytes= */
 	uint32_t tarokKickoffHeadroomRegionRate; /**< used by calculating tarokKickoffHeadroomInBytes, the percentage of the free memory, range: 0(0%)<=the rate<=50(50%) , default=2 (2%)  */
@@ -1545,6 +1546,7 @@ public:
 		, tarokGMPIntermission(UDATA_MAX)
 		, tarokAutomaticGMPIntermission(true)
 		, tarokRegionMaxAge(0)
+		, tarokKickoffHeadroomRegionCount(0)
 		, tarokKickoffHeadroomInBytes(0)
 		, tarokForceKickoffHeadroomInBytes(false)
 		, tarokKickoffHeadroomRegionRate(2)
