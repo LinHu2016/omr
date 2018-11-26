@@ -320,7 +320,7 @@ public:
 	double largeObjectAreaInitialRatio;
 	double largeObjectAreaMinimumRatio;
 	double largeObjectAreaMaximumRatio;
-	bool debugLOAResize;
+//	bool debugLOAResize;
 	bool debugLOAFreelist;
 	bool debugLOAAllocate;
 	int loaFreeHistorySize; /**< max size of _loaFreeRatioHistory array */
@@ -1300,7 +1300,7 @@ public:
 		, largeObjectAreaInitialRatio(0.050) /* initial LOA 5% */
 		, largeObjectAreaMinimumRatio(0.01) /* initial LOA 1% */
 		, largeObjectAreaMaximumRatio(0.500) /* maximum LOA 50% */
-		, debugLOAResize(false)
+//		, debugLOAResize(false)
 		, debugLOAFreelist(false)
 		, debugLOAAllocate(false)
 		, loaFreeHistorySize(15)
