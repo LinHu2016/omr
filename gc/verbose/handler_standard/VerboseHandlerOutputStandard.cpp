@@ -614,25 +614,32 @@ MM_VerboseHandlerOutputStandard::handleConcurrentKickoff(J9HookInterface** hook,
 	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
 	char tagTemplate[200];
 	enterAtomicReportingBlock();
-	getTagTemplate(tagTemplate, sizeof(tagTemplate), manager->getIdAndIncrement(), omrtime_current_time_millis());
-	writer->formatAndOutput(env, 0, "<concurrent-kickoff %s>", tagTemplate);
 
-	const char* reasonString = getConcurrentKickoffReason(eventData);
+	if (WARNING_ONLY_NO_KICKOFF != (ConcurrentKickoffReason)event->reason) {
+		getTagTemplate(tagTemplate, sizeof(tagTemplate), manager->getIdAndIncrement(), omrtime_current_time_millis());
+		writer->formatAndOutput(env, 0, "<concurrent-kickoff %s>", tagTemplate);
 
-	if (extensions->isScavengerEnabled()) {
-		writer->formatAndOutput(
-				env, 1, "<kickoff reason=\"%s\" targetBytes=\"%zu\" thresholdFreeBytes=\"%zu\"  remainingFree=\"%zu\" tenureFreeBytes=\"%zu\" nurseryFreeBytes=\"%zu\" />",
-				reasonString, event->traceTarget, event->kickOffThreshold, event->remainingFree, event->commonData->tenureFreeBytes, event->commonData->nurseryFreeBytes);
+		const char* reasonString = getConcurrentKickoffReason(eventData);
+
+		if (extensions->isScavengerEnabled()) {
+			writer->formatAndOutput(
+					env, 1, "<kickoff reason=\"%s\" targetBytes=\"%zu\" thresholdFreeBytes=\"%zu\"  remainingFree=\"%zu\" tenureFreeBytes=\"%zu\" nurseryFreeBytes=\"%zu\" />",
+					reasonString, event->traceTarget, event->kickOffThreshold, event->remainingFree, event->commonData->tenureFreeBytes, event->commonData->nurseryFreeBytes);
+		} else {
+			writer->formatAndOutput(
+					env, 1, "<kickoff reason=\"%s\" targetBytes=\"%zu\" thresholdFreeBytes=\"%zu\" remainingFree=\"%zu\" tenureFreeBytes=\"%zu\" />",
+					reasonString, event->traceTarget, event->kickOffThreshold, event->remainingFree, event->commonData->tenureFreeBytes);
+		}
+		writer->formatAndOutput(env, 0, "</concurrent-kickoff>");
+		writer->flush(env);
+
+		handleConcurrentKickoffInternal(env, eventData);
 	} else {
-		writer->formatAndOutput(
-				env, 1, "<kickoff reason=\"%s\" targetBytes=\"%zu\" thresholdFreeBytes=\"%zu\" remainingFree=\"%zu\" tenureFreeBytes=\"%zu\" />",
-				reasonString, event->traceTarget, event->kickOffThreshold, event->remainingFree, event->commonData->tenureFreeBytes);
+		writer->formatAndOutput(env, 0, "<warning details=\"missed concurrent-kickoff due to macro fragmentation, thresholdFreeBytes=%zu  estimateRemainingFree=%zu estimateRemainingFreeExcludingFragmentation=%zu\" />",
+				event->kickOffThreshold, event->remainingFree, event->remainingNonFragmentedFree);
+		writer->flush(env);
+
 	}
-	writer->formatAndOutput(env, 0, "</concurrent-kickoff>");
-	writer->flush(env);
-
-	handleConcurrentKickoffInternal(env, eventData);
-
 	exitAtomicReportingBlock();
 }
 

@@ -315,12 +315,13 @@ private:
 
 	bool tracingRateDropped(MM_EnvironmentBase *env);
 #if defined(OMR_GC_MODRON_SCAVENGER)	
-	uintptr_t potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription);
+	uintptr_t potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription, uintptr_t *potentialNonFragmentedFree = NULL);
 #endif /*OMR_GC_MODRON_SCAVENGER */	
 
 	bool cleanCards(MM_EnvironmentBase *env, bool isMutator, uintptr_t sizeToDo, uintptr_t  *sizeDone, bool threadAtSafePoint);
 
 	void reportConcurrentKickoff(MM_EnvironmentBase *env);
+	void reportWarningForConcurrentKickoff(MM_EnvironmentBase *env);
 	void reportConcurrentAborted(MM_EnvironmentBase *env, CollectionAbortReason reason);
 	virtual void reportConcurrentHalted(MM_EnvironmentBase *env);
 	void reportConcurrentFinalCardCleaningStart(MM_EnvironmentBase *env);

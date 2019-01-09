@@ -47,6 +47,8 @@ class MM_ConcurrentGCStats : public MM_Base
 	uintptr_t _kickoffThreshold;
 	uintptr_t _cardCleaningThreshold;
 	uintptr_t _remainingFree;
+	uintptr_t _remainingNonFragmentedFree;
+	bool _warningConcurrentKickoff;
 	
 	uintptr_t _allocationsTaxed;
 	uintptr_t _allocationsTaxedAt0;
@@ -112,6 +114,10 @@ public:
 	
 	MMINLINE void  setRemainingFree(uintptr_t free) { _remainingFree = free; };
 	MMINLINE uintptr_t getRemainingFree() { return _remainingFree; };
+	MMINLINE void  setRemainingNonFragmentedFree(uintptr_t free) { _remainingNonFragmentedFree = free; };
+	MMINLINE uintptr_t getRemainingNonFragmentedFree() { return _remainingNonFragmentedFree; };
+	MMINLINE void  setWarningConcurrentKickoff(bool warning) { _warningConcurrentKickoff = warning; };
+	MMINLINE bool getWarningConcurrentKickoff() { return _warningConcurrentKickoff; };
 	
 	MMINLINE void  clearAllocationTaxCounts()				
 	{
@@ -243,6 +249,8 @@ public:
 		_kickoffThreshold(0),
 		_cardCleaningThreshold(0),
 		_remainingFree(0),
+		_remainingNonFragmentedFree(0),
+		_warningConcurrentKickoff(false),
 		_allocationsTaxed(0),
 		_allocationsTaxedAt0(0),
 		_allocationsTaxedAt25(0),

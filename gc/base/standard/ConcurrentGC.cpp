@@ -188,6 +188,27 @@ void oldToOldReferenceCreated(MM_EnvironmentBase *env, omrobjectptr_t objectPtr)
 #endif /* OMR_GC_MODRON_SCAVENGER */
 
 } /* extern "C" */
+void
+MM_ConcurrentGC::reportWarningForConcurrentKickoff(MM_EnvironmentBase *env)
+{
+	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+
+	MM_CommonGCData commonData;
+
+	TRIGGER_J9HOOK_MM_PRIVATE_CONCURRENT_KICKOFF(
+		_extensions->privateHookInterface,
+		env->getOmrVMThread(),
+		omrtime_hires_clock(),
+		J9HOOK_MM_PRIVATE_CONCURRENT_KICKOFF,
+		_extensions->getHeap()->initializeCommonGCData(env, &commonData),
+		_stats.getTraceSizeTarget(),
+		_stats.getKickoffThreshold(),
+		_stats.getRemainingFree(),
+		_stats.getRemainingNonFragmentedFree(),
+		_stats.getKickoffReason(),
+		_languageKickoffReason
+	);
+}
 
 void
 MM_ConcurrentGC::reportConcurrentKickoff(MM_EnvironmentBase *env)
@@ -211,6 +232,7 @@ MM_ConcurrentGC::reportConcurrentKickoff(MM_EnvironmentBase *env)
 		_stats.getTraceSizeTarget(),
 		_stats.getKickoffThreshold(),
 		_stats.getRemainingFree(),
+		_stats.getRemainingNonFragmentedFree(),
 		_stats.getKickoffReason(),
 		_languageKickoffReason
 	);
@@ -1454,6 +1476,7 @@ MM_ConcurrentGC::tuneToHeap(MM_EnvironmentBase *env)
 
 	kickoffThresholdPlusBuffer = (uintptr_t)((float)kickoffThreshold + boost + ((float)_extensions->concurrentSlack * kickoffProportion));
 	_stats.setKickoffThreshold(kickoffThresholdPlusBuffer);
+	_stats.setWarningConcurrentKickoff(false);
 	_stats.setCardCleaningThreshold((uintptr_t)((float)cardCleaningThreshold + boost + ((float)_extensions->concurrentSlack * cardCleaningProportion)));
 	_kickoffThresholdBuffer = MM_Math::saturatingSubtract(kickoffThresholdPlusBuffer, kickoffThreshold);
 
@@ -1815,9 +1838,10 @@ MM_ConcurrentGC::periodicalTuningNeeded(MM_EnvironmentBase *env, uintptr_t freeS
  * @return  Number of bytes available for allocation before old area is exhausted
  */
 MMINLINE uintptr_t
-MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription)
+MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription, uintptr_t* potentialNonFragmentedFree)
 {
 		uintptr_t nurseryPromotion, nurseryInitialFree, currentOldFree, currentNurseryFree;
+		uintptr_t currentOldNonFragmentedFree = 0;
 		MM_MemorySpace *memorySpace = env->getExtensions()->heap->getDefaultMemorySpace();
 		MM_MemorySubSpace *oldSubspace = memorySpace->getTenureMemorySubSpace();
 		MM_MemorySubSpace *newSubspace = memorySpace->getDefaultMemorySubSpace();
@@ -1844,7 +1868,16 @@ MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescript
 		/* reduce oldspace free memory by fragmented estimation */
 		MM_LargeObjectAllocateStats *stats = oldSubspace->getMemoryPool()->getLargeObjectAllocateStats();
 		if (NULL != stats) {
-			uintptr_t fragmentation = (uintptr_t) ((env->getExtensions())->concurrentSlackFragmentationAdjustmentWeight * stats->getRemainingFreeMemoryAfterEstimate());
+			uintptr_t fragmentation = stats->getRemainingFreeMemoryAfterEstimate();
+			currentOldNonFragmentedFree = currentOldFree;
+			if (0.9 > (env->getExtensions())->concurrentSlackFragmentationAdjustmentWeight) {
+				if (currentOldFree > fragmentation) {
+					currentOldNonFragmentedFree = currentOldNonFragmentedFree - fragmentation;
+				} else {
+					currentOldNonFragmentedFree = 0;
+				}
+			}
+			fragmentation = (uintptr_t) ((env->getExtensions())->concurrentSlackFragmentationAdjustmentWeight * fragmentation);
 			if (currentOldFree > fragmentation) {
 				currentOldFree -= fragmentation;
 			} else {
@@ -1859,12 +1892,14 @@ MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescript
 		 * remaining before concurren KO is required
 		 */
 		uintptr_t scavengesRemaining;
+		uintptr_t scavengesRemainingNonFragmented = 0;
 		if (scavengerStats->_nextScavengeWillPercolate) {
 			scavengesRemaining = 0;
 			_stats.setKickoffReason(NEXT_SCAVENGE_WILL_PERCOLATE);
 			_languageKickoffReason = NO_LANGUAGE_KICKOFF_REASON;
 		} else {
 			scavengesRemaining =  (uintptr_t)(currentOldFree/nurseryPromotion);
+			scavengesRemainingNonFragmented = (uintptr_t)(currentOldNonFragmentedFree/nurseryPromotion);
 		}
 
 		/* KO concurrent one scavenge early to reduce chances of tenure space being exhausted
@@ -1872,7 +1907,7 @@ MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescript
 		 * the average number of bytes.
 		 */
 		scavengesRemaining = scavengesRemaining > 0  ?  scavengesRemaining - 1 : 0;
-
+		scavengesRemainingNonFragmented = scavengesRemainingNonFragmented > 0  ?  scavengesRemainingNonFragmented - 1 : 0;
 		/* Now calculate how many bytes we can therefore allocate in the nursery before
 		 * we will fill the tenure area. On 32 bit platforms this can be greater than 4G
 		 * hence the 64 bit maths. We assume that the heap will not be big enough on 64 bit
@@ -1881,6 +1916,8 @@ MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescript
 
 		uint64_t potentialFree = (uint64_t)currentNurseryFree +
 							 ((uint64_t)nurseryInitialFree * (uint64_t)scavengesRemaining);
+		uint64_t potentialNonFragmentedFree64 = (uint64_t)currentNurseryFree +
+							 ((uint64_t)nurseryInitialFree * (uint64_t)scavengesRemainingNonFragmented);
 
 #if !defined(OMR_ENV_DATA64)
 		/* On a 32 bit platforms the amount of free space could be more than 4G. Therefore
@@ -1888,6 +1925,16 @@ MM_ConcurrentGC::potentialFreeSpace(MM_EnvironmentBase *env, MM_AllocateDescript
 		 * bits we just return 4G.
 		 */
 		uint64_t maxFree = 0xFFFFFFFF;
+#endif
+		if (NULL != potentialNonFragmentedFree) {
+#if !defined(OMR_ENV_DATA64)
+			if (potentialNonFragmentedFree64 > maxFree){
+				potentialNonFragmentedFree64 = maxFree;
+			}
+#endif
+			*potentialNonFragmentedFree = (uintptr_t)potentialNonFragmentedFree64;
+		}
+#if !defined(OMR_ENV_DATA64)
 		if (potentialFree > maxFree){
 			return (uintptr_t)maxFree;
 		} else {
@@ -2257,6 +2304,7 @@ bool
 MM_ConcurrentGC::timeToKickoffConcurrent(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription)
 {
 	uintptr_t remainingFree;
+	uintptr_t remainingNonFragmentedFree = UDATA_MAX;
 
 	/* If -Xgc:noConcurrentMarkKO specifed then we never
 	 * kickoff concurrent mark
@@ -2268,7 +2316,11 @@ MM_ConcurrentGC::timeToKickoffConcurrent(MM_EnvironmentBase *env, MM_AllocateDes
 	/* Determine how much "taxable" free space remains to be allocated. */
 #if defined(OMR_GC_MODRON_SCAVENGER)
 	if(_extensions->scavengerEnabled) {
-		remainingFree = potentialFreeSpace(env, allocDescription);
+		if (_stats.getWarningConcurrentKickoff()) {
+			remainingFree = potentialFreeSpace(env, allocDescription);
+		} else {
+			remainingFree = potentialFreeSpace(env, allocDescription, &remainingNonFragmentedFree);
+		}
 	} else
 #endif /* OMR_GC_MODRON_SCAVENGER */
 	{
@@ -2311,6 +2363,15 @@ MM_ConcurrentGC::timeToKickoffConcurrent(MM_EnvironmentBase *env, MM_AllocateDes
 		}
 		return true;
 	} else {
+		if (remainingNonFragmentedFree < _stats.getKickoffThreshold()) {
+			_stats.setWarningConcurrentKickoff(true);
+			_stats.setRemainingFree(remainingFree);
+			_stats.setRemainingNonFragmentedFree(remainingNonFragmentedFree);
+			_stats.setKickoffReason(WARNING_ONLY_NO_KICKOFF);
+			_languageKickoffReason = NO_LANGUAGE_KICKOFF_REASON;
+			reportWarningForConcurrentKickoff(env);
+			_stats.clearKickoffReason();
+		}
 		return false;
 	}
 }

@@ -251,6 +251,7 @@ SPDX-License-Identifier: EPL-2.0 OR Apache-2.0 OR GPL-2.0 WITH Classpath-excepti
 		<data type="uintptr_t" name="traceTarget" description="the targetted number of bytes to be concurrently traced" />
 		<data type="uintptr_t" name="kickOffThreshold" decription="the number of bytes free at which concurrent gc will begin" />
 		<data type="uintptr_t" name="remainingFree" description="the number of bytes free at the point of kickoff"/>
+		<data type="uintptr_t" name="remainingNonFragmentedFree" description="the number of bytes free excluding macro fragmentation at the point of kickoff"/>
 		<data type="uintptr_t" name="reason" description="reason for kickoff" />
 		<data type="uintptr_t" name="languageReason" description="language specific reason (if available)" />
 	</event>
