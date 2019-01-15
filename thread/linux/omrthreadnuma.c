@@ -35,6 +35,7 @@
 #include <inttypes.h>
 #include <sched.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <stdio.h>
 
 #include "omrcfg.h"
@@ -268,6 +269,47 @@ initializeNumaNodeData(omrthread_library_t threadLibrary, uintptr_t numNodes)
 #endif /* defined(OMR_PORT_NUMA_SUPPORT) */
 
 /**
+ * glibc doesn't include get_mempolicy. It is in libnuma, but we can't rely on that being available on all systems.
+ * We define our own helper to make the syscall so that we can use it without relying on external libraries.
+ *
+ * For details, see the man page for get_mempolicy(2).
+ * Below is an incomplete summary.
+ *
+ * do_get_mempolicy()
+ *
+ *     gets the NUMA policy of the calling process or virtual memory address
+ *
+ * @param int           *policy  [out] returns the policy, or next interleave node
+ * @param unsigned long *nmask   [out] the node bit mask associated with the policy
+ * @param unsigned long  maxnode [in]  length of nmask array
+ * @param unsigned long  addr    [in]  virtual memory address of requested policy info
+ * @param unsigned long  flags   [in]  controls get_mempolicy behaviour
+ *
+ * @return 0 on success, -1 on error returned via errno.
+ * errno==EFAULT: Part of all of memory specified by nmask inaccessible
+ * errno==EINVAL: Invalid arguments (many invalid combinations).
+ */
+static long
+do_get_mempolicy(int *policy, unsigned long *nmask, unsigned long maxnode, unsigned long addr, unsigned long flags)
+{
+	return (long)syscall(SYS_get_mempolicy, policy, nmask, maxnode, addr, flags);
+}
+
+int check_memorypolicy() {
+	int ret = 0;
+	unsigned long mask[1024 / 8 / sizeof(unsigned long)];
+
+	uintptr_t maxNodes = sizeof(mask) * 8;
+
+	/* look-up the process's default NUMA policy as applied to the set of nodes (the policy is usually "0" and applies to no nodes) */
+	int numa_policy_mode = -1;
+	memset(&mask, 0, sizeof(mask));
+	ret = do_get_mempolicy(&numa_policy_mode, mask, maxNodes, (unsigned long)NULL, 0);
+
+	return ret;
+}
+
+/**
  * Initializes NUMA data by parsing the /sys/devices/system/node/ directory.
  *
  * This function must only be called *once*. It is called from omrthread_init().
@@ -295,7 +337,7 @@ omrthread_numa_init(omrthread_library_t threadLibrary)
 	 * The libc version on RHEL 4 requires 3 arg to sched_setaffinity.
 	 * Note: this will not compile/run properly on RHEL 3.
 	 */
-	if (0 != sched_getaffinity(0, sizeof(cpu_set_t), &defaultAffinityMask))
+	if ((0 != sched_getaffinity(0, sizeof(cpu_set_t), &defaultAffinityMask)) || (0 != check_memorypolicy()))
 #else
 	if (0 != sched_getaffinity(0, &defaultAffinityMask))
 #endif
