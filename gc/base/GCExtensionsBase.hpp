@@ -747,6 +747,23 @@ public:
 	double tarokConcurrentMarkingCostWeight; /**< How much we weigh concurrentMarking into our GMP scan time cost calculations */
 	bool tarokAutomaticDefragmentEmptinessThreshold; /**< Whether we should use the automatically derived value for tarokDefragmentEmptinessThreshold or not */
 	bool tarokEnableCopyForwardHybrid; /**< Enable CopyForward Hybrid mode */
+
+	enum ReserveRegions {
+
+		PRESERVE_REGIONS_NO = 0,
+		PRESERVE_REGIONS_MOST_ALLOCATABLE,
+		PRESERVE_REGIONS_MOST_FREE
+	};
+	ReserveRegions tarokReserveRegionsFromCollectionSet;
+	bool tarokEnableFindTailsAfterSweep;
+	bool tarokPrintRegions;
+//	bool tarokSortTailCandidateAscending;
+	enum TarokRegionTailCondidateListSortOrder {
+		SORT_ORDER_NOORDER = 0,
+		SORT_ORDER_ASCENDING,
+		SORT_ORDER_DESCENDING
+	};
+	TarokRegionTailCondidateListSortOrder tarokTailCandidateListSortOrder;
 #if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)
 	bool _isConcurrentCopyForward;
 #endif
@@ -754,6 +771,7 @@ public:
 
 /* OMR_GC_VLHGC (in for all -- see 82589) */
 	bool tarokEnableExpensiveAssertions; /**< True if the collector should perform extra consistency verifications which are known to be very expensive or poorly parallelized */
+	bool tarokEnableAllocationPointerAssertion;
 /* OMR_GC_VLHGC (in for all) */
 
 	MM_SweepPoolManagerAddressOrderedList* sweepPoolManagerAddressOrderedList; /**< Pointer to Sweep Pool Manager for MPAOL, used for LOA and nursery */
@@ -1724,11 +1742,17 @@ public:
 		, tarokConcurrentMarkingCostWeight(0.05)
 		, tarokAutomaticDefragmentEmptinessThreshold(false)
 		, tarokEnableCopyForwardHybrid(true)
+		, tarokReserveRegionsFromCollectionSet(PRESERVE_REGIONS_NO)
+		, tarokEnableFindTailsAfterSweep(false)
+		, tarokPrintRegions(false)
+//		, tarokSortTailCandidateAscending(false)
+		, tarokTailCandidateListSortOrder(SORT_ORDER_NOORDER)
 #if defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD)
 		, _isConcurrentCopyForward(false)
 #endif /* defined(OMR_GC_VLHGC_CONCURRENT_COPY_FORWARD) */
 #endif /* defined (OMR_GC_VLHGC) */
 		, tarokEnableExpensiveAssertions(false)
+		, tarokEnableAllocationPointerAssertion(false)
 		, sweepPoolManagerAddressOrderedList(NULL)
 		, sweepPoolManagerSmallObjectArea(NULL)
 		, sweepPoolManagerBumpPointer(NULL)
