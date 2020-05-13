@@ -37,6 +37,7 @@ public:
 	uintptr_t _tlhRefreshCountFresh; /**< Number of refreshes where fresh memory was allocated. */
 	uintptr_t _tlhRefreshCountReused; /**< Number of refreshes where TLHs were reused. */
 	uintptr_t _tlhAllocatedFresh; /**< The amount of memory allocated fresh out of the heap. */
+	uintptr_t _tlhAllocatedUsed; /**< The amount of memory has been flushed */
 	uintptr_t _tlhAllocatedReused; /**< The amount of memory allocated form reused TLHs. */
 	uintptr_t _tlhRequestedBytes; /**< The amount of memory requested for refreshes. */
 	uintptr_t _tlhDiscardedBytes; /**< The amount of memory from discarded TLHs. */
@@ -59,14 +60,22 @@ public:
 
 #if defined(OMR_GC_THREAD_LOCAL_HEAP)
 	uintptr_t tlhBytesAllocated() { return _tlhAllocatedFresh - _tlhDiscardedBytes; }
+	uintptr_t tlhBytesAllocatedUsed() { return _tlhAllocatedUsed - _tlhDiscardedBytes; }
 	uintptr_t nontlhBytesAllocated() { return _allocationBytes; }
 #endif
 
-	uintptr_t bytesAllocated(){
+	/* return bytesAllocated includes new refreshed TLH, if used == false(default)
+	 * return bytesAllocated (but does not include new refreshed TLH), if used == true. 
+	 */
+	uintptr_t bytesAllocated(bool used = false) {
 		uintptr_t totalBytesAllocated = 0;
 
-#if defined(OMR_GC_THREAD_LOCAL_HEAP)	
-		totalBytesAllocated += tlhBytesAllocated();
+#if defined(OMR_GC_THREAD_LOCAL_HEAP)
+		if (used) {
+			totalBytesAllocated += tlhBytesAllocatedUsed();
+		} else {
+			totalBytesAllocated += tlhBytesAllocated();
+		}
 		totalBytesAllocated += nontlhBytesAllocated();
 #else
 		totalBytesAllocated += _allocationBytes;
@@ -80,6 +89,7 @@ public:
 		_tlhRefreshCountFresh(0),
 		_tlhRefreshCountReused(0),
 		_tlhAllocatedFresh(0),
+		_tlhAllocatedUsed(0),
 		_tlhAllocatedReused(0),
 		_tlhRequestedBytes(0),
 		_tlhDiscardedBytes(0),

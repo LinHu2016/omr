@@ -91,7 +91,8 @@ MM_TLHAllocationSupport::clear(MM_EnvironmentBase *env)
 
 	/* Any previous cache to clear  ? */
 	if (NULL != memoryPool) {
-		memoryPool->abandonTlhHeapChunk(getRealAlloc(), getTop());
+//		memoryPool->abandonTlhHeapChunk(getRealAlloc(), getTop());
+		memoryPool->abandonTlhHeapChunk(getAlloc(), getRealTop());
 		reportClearCache(env);
 	}
 	wipeTLH(env);
@@ -172,17 +173,20 @@ MM_TLHAllocationSupport::refresh(MM_EnvironmentBase *env, MM_AllocateDescription
 
 	MM_AllocationStats *stats = _objectAllocationInterface->getAllocationStats();
 
-	stats->_tlhDiscardedBytes += getSize();
+	stats->_tlhDiscardedBytes += getRealSize();
+	stats->_tlhAllocatedUsed = stats->_tlhAllocatedFresh;
 
 	/* Try to cache the current TLH */
-	if (NULL != getRealAlloc() && getSize() >= tlhMinimumSize) {
+//	if (NULL != getRealAlloc() && getSize() >= tlhMinimumSize) {
+	if (NULL != getRealTop() && getRealSize() >= tlhMinimumSize) {
 		/* Cache the current TLH because it is bigger than the minimum size */
-		MM_HeapLinkedFreeHeaderTLH* newCache = (MM_HeapLinkedFreeHeaderTLH*)getRealAlloc();
+//		MM_HeapLinkedFreeHeaderTLH* newCache = (MM_HeapLinkedFreeHeaderTLH*)getRealAlloc();
+		MM_HeapLinkedFreeHeaderTLH* newCache = (MM_HeapLinkedFreeHeaderTLH*)getAlloc();
 
 #if defined(OMR_VALGRIND_MEMCHECK)
 		valgrindMakeMemUndefined((uintptr_t)newCache, sizeof(MM_HeapLinkedFreeHeaderTLH));			
 #endif /* defined(OMR_VALGRIND_MEMCHECK) */
-	    newCache->setSize(getSize());
+	    newCache->setSize(getRealSize());
 		newCache->_memoryPool = getMemoryPool();
 		newCache->_memorySubSpace = getMemorySubSpace();
 		newCache->setNext(_abandonedList, compressed);
@@ -333,11 +337,18 @@ void *
 MM_TLHAllocationSupport::allocateTLH(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription, MM_MemorySubSpace *memorySubSpace, MM_MemoryPool *memoryPool)
 {
 	void *addrBase, *addrTop;
-
-	if(memoryPool->allocateTLH(env, allocDescription, getRefreshSize(), addrBase, addrTop)) {
+	uintptr_t usedSize = getUsedSize();
+	if (memoryPool->allocateTLH(env, allocDescription, getRefreshSize(), addrBase, addrTop)) {
 		setupTLH(env, addrBase, addrTop, memorySubSpace, memoryPool);
 		allocDescription->setMemorySubSpace(memorySubSpace);
 		allocDescription->setObjectFlags(memorySubSpace->getObjectFlags());
+
+		uintptr_t samplingBytesGranularity = UDATA_MAX;
+		if (!env->needDisableInlineAllocation() && (UDATA_MAX != (samplingBytesGranularity = env->getExtensions()->objectSamplingBytesGranularity))) {
+			uintptr_t traceBytes = (env->_traceAllocationBytes + usedSize) % samplingBytesGranularity;
+			env->setTLHSamplingTop(samplingBytesGranularity - traceBytes);
+		}
+
 		return addrBase;
 	}
 	return NULL;

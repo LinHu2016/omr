@@ -28,7 +28,8 @@
 
 typedef struct LanguageThreadLocalHeapStruct {
     uint8_t* heapBase;
-    uint8_t* realHeapAlloc;
+//    uint8_t* realHeapAlloc;
+    uint8_t* realHeapTop;
     uintptr_t objectFlags;
     uintptr_t refreshSize;
     void* memorySubSpace;

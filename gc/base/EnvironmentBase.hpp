@@ -146,8 +146,9 @@ public:
 
 	MM_FreeEntrySizeClassStats _freeEntrySizeClassStats;  /**< GC thread local statistics structure for heap free entry size (sizeClass) distribution */
 
-	uintptr_t _oolTraceAllocationBytes; /**< Tracks the bytes allocated since the last ool object trace */
-	uintptr_t _traceAllocationBytes;  /**< Tracks the bytes allocated since the last object trace include ool and allocation is completed from TLH */
+	uintptr_t _oolTraceAllocationBytes; /**< Tracks the bytes allocated since the last ool object trace for Trace */
+	uintptr_t _traceAllocationBytes;  /**< Tracks the bytes allocated since the last ool object trace for Hooks ( only record ool allocation bytes and flushed TLH size) */
+	uintptr_t _traceAllocationAdjustmentBytes; /**< keep the bytes of times of sampling thresold for last object trace(include allocation byttes inside TLH) */
 
 	uintptr_t approxScanCacheCount; /**< Local copy of approximate entries in global Cache Scan List. Updated upon allocation of new cache. */
 
@@ -526,23 +527,30 @@ public:
 
 #if defined (OMR_GC_THREAD_LOCAL_HEAP)
 	/**
-	 * Disable inline TLH allocates by hiding the real heap allocation address from
-	 * JIT/Interpreter in realHeapAlloc and setting heapALloc == HeapTop so TLH
+	 * Disable inline TLH allocates by hiding the real heap top address from
+	 * JIT/Interpreter in realHeapTop and setting HeapTop == heapALloc so TLH
 	 * looks full.
 	 *
 	 */
 	void disableInlineTLHAllocate() { _delegate.disableInlineTLHAllocate(); }
 
 	/**
-	 * Re-enable inline TLH allocate by restoring heapAlloc from realHeapAlloc
+	 * Re-enable inline TLH allocate by restoring heapTop from realHeapTop
 	 */
 	void enableInlineTLHAllocate() { _delegate.enableInlineTLHAllocate(); }
 
 	/**
-	 * Determine if inline TLH allocate is enabled; its enabled if realheapAlloc is NULL.
+	 * Determine if inline TLH allocate is enabled; its enabled if realheapTop is NULL.
 	 * @return TRUE if inline TLH allocates currently enabled for this thread; FALSE otherwise
 	 */
 	bool isInlineTLHAllocateEnabled() { return _delegate.isInlineTLHAllocateEnabled(); }
+
+	void setTLHSamplingTop(uintptr_t size) { _delegate.setTLHSamplingTop(size); }
+	void resetTLHSamplingTop() { _delegate.resetTLHSamplingTop(); }
+	uintptr_t getAllocSizeInsideTLH() { return _delegate.getAllocSizeInsideTLH(); }
+	bool needDisableInlineAllocation() {
+		return (getExtensions()->fvtest_disableInlineAllocation || getExtensions()->instrumentableAllocateHookEnabled || getExtensions()->disableInlineCacheForAllocationThreshold);
+	}
 #endif /* OMR_GC_THREAD_LOCAL_HEAP */
 
 	MMINLINE uintptr_t getWorkUnitIndex() { return _workUnitIndex; }
@@ -666,6 +674,7 @@ public:
 		,_freeEntrySizeClassStats()
 		,_oolTraceAllocationBytes(0)
 		,_traceAllocationBytes(0)
+		,_traceAllocationAdjustmentBytes(0)
 		,approxScanCacheCount(0)
 		,_activeValidator(NULL)
 		,_lastSyncPointReached(NULL)
@@ -719,6 +728,7 @@ public:
 		,_freeEntrySizeClassStats()
 		,_oolTraceAllocationBytes(0)
 		,_traceAllocationBytes(0)
+		,_traceAllocationAdjustmentBytes(0)
 		,approxScanCacheCount(0)
 		,_activeValidator(NULL)
 		,_lastSyncPointReached(NULL)

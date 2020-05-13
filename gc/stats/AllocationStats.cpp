@@ -30,6 +30,7 @@ MM_AllocationStats::clear()
 	_tlhRefreshCountFresh = 0;
 	_tlhRefreshCountReused = 0;
 	_tlhAllocatedFresh = 0;
+	_tlhAllocatedUsed = 0;
 	_tlhAllocatedReused = 0;
 	_tlhRequestedBytes = 0;
 	_tlhDiscardedBytes = 0;
@@ -54,6 +55,7 @@ MM_AllocationStats::merge(MM_AllocationStats *stats)
 	MM_AtomicOperations::add(&_tlhRefreshCountFresh, stats->_tlhRefreshCountFresh);
 	MM_AtomicOperations::add(&_tlhRefreshCountReused, stats->_tlhRefreshCountReused);
 	MM_AtomicOperations::add(&_tlhAllocatedFresh, stats->_tlhAllocatedFresh);
+	MM_AtomicOperations::add(&_tlhAllocatedUsed, stats->_tlhAllocatedUsed);
 	MM_AtomicOperations::add(&_tlhRequestedBytes, stats->_tlhRequestedBytes);
 	MM_AtomicOperations::add(&_tlhDiscardedBytes, stats->_tlhDiscardedBytes);
 	MM_AtomicOperations::add(&_tlhAllocatedReused, stats->_tlhAllocatedReused);
