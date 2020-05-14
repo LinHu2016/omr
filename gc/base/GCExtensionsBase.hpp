@@ -1392,7 +1392,7 @@ public:
 		, frequentObjectsStats(NULL)
 		, frequentObjectAllocationSamplingDepth(0)
 		, estimateFragmentation(GLOBALGC_ESTIMATE_FRAGMENTATION)
-		, processLargeAllocateStats(true) /* turn on processLargeAllocateStats by default */
+		, processLargeAllocateStats(false) /* turn off processLargeAllocateStats by default */
 		, largeObjectAllocationProfilingThreshold(512)
 		, largeObjectAllocationProfilingVeryLargeObjectThreshold(UDATA_MAX)
 		, largeObjectAllocationProfilingVeryLargeObjectSizeClass(0)
