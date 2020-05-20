@@ -60,7 +60,7 @@ public:
 
 #if defined(OMR_GC_THREAD_LOCAL_HEAP)
 	uintptr_t tlhBytesAllocated() { return _tlhAllocatedFresh - _tlhDiscardedBytes; }
-	uintptr_t tlhBytesAllocatedUsed() { return _tlhAllocatedUsed - _tlhDiscardedBytes; }
+	uintptr_t tlhBytesAllocatedUsed() { return _tlhAllocatedUsed; }
 	uintptr_t nontlhBytesAllocated() { return _allocationBytes; }
 #endif
 

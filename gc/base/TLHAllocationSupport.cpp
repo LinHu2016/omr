@@ -92,6 +92,9 @@ MM_TLHAllocationSupport::clear(MM_EnvironmentBase *env)
 	/* Any previous cache to clear  ? */
 	if (NULL != memoryPool) {
 //		memoryPool->abandonTlhHeapChunk(getRealAlloc(), getTop());
+	//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+	//	omrtty_printf("clear env=%p, getAlloc()=%p, getRealTop()=%p\n", env, getAlloc(), getRealTop());
+//
 		memoryPool->abandonTlhHeapChunk(getAlloc(), getRealTop());
 		reportClearCache(env);
 	}
@@ -174,7 +177,11 @@ MM_TLHAllocationSupport::refresh(MM_EnvironmentBase *env, MM_AllocateDescription
 	MM_AllocationStats *stats = _objectAllocationInterface->getAllocationStats();
 
 	stats->_tlhDiscardedBytes += getRealSize();
-	stats->_tlhAllocatedUsed = stats->_tlhAllocatedFresh;
+	uintptr_t usedSize = getUsedSize();
+	stats->_tlhAllocatedUsed += usedSize;
+//
+//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+//	omrtty_printf("allocateTLH env=%p, stats->_tlhAllocatedUsed=%zu, stats->_tlhAllocatedFresh=%zu, stats->_tlhDiscardedBytes=%zu, getRealSize()=%zu, usedSize=%zu \n", env, stats->_tlhAllocatedUsed, stats->_tlhAllocatedFresh, stats->_tlhDiscardedBytes, getRealSize(), usedSize);
 
 	/* Try to cache the current TLH */
 //	if (NULL != getRealAlloc() && getSize() >= tlhMinimumSize) {
@@ -267,6 +274,15 @@ MM_TLHAllocationSupport::refresh(MM_EnvironmentBase *env, MM_AllocateDescription
 	}
 
 	if (didRefresh) {
+
+		uintptr_t samplingBytesGranularity = UDATA_MAX;
+		if (!env->needDisableInlineAllocation() && (UDATA_MAX != (samplingBytesGranularity = env->getExtensions()->objectSamplingBytesGranularity))) {
+			uintptr_t traceBytes = (env->_traceAllocationBytes + usedSize) % samplingBytesGranularity;
+//
+//			omrtty_printf("allocateTLH setTLHSamplingTop() env=%p, samplingBytesGranularity=%zu, traceBytes=%zu, env->_traceAllocationBytes=%zu, usedSize=%zu\n", env, samplingBytesGranularity, traceBytes, env->_traceAllocationBytes, usedSize);
+
+			env->setTLHSamplingTop(samplingBytesGranularity - traceBytes);
+		}
 		/*
 		 * THL was refreshed however it might be already flushed in GC
 		 * Some special features (like Prepare Heap For Walk called by GC check)
@@ -337,18 +353,11 @@ void *
 MM_TLHAllocationSupport::allocateTLH(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription, MM_MemorySubSpace *memorySubSpace, MM_MemoryPool *memoryPool)
 {
 	void *addrBase, *addrTop;
-	uintptr_t usedSize = getUsedSize();
+
 	if (memoryPool->allocateTLH(env, allocDescription, getRefreshSize(), addrBase, addrTop)) {
 		setupTLH(env, addrBase, addrTop, memorySubSpace, memoryPool);
 		allocDescription->setMemorySubSpace(memorySubSpace);
 		allocDescription->setObjectFlags(memorySubSpace->getObjectFlags());
-
-		uintptr_t samplingBytesGranularity = UDATA_MAX;
-		if (!env->needDisableInlineAllocation() && (UDATA_MAX != (samplingBytesGranularity = env->getExtensions()->objectSamplingBytesGranularity))) {
-			uintptr_t traceBytes = (env->_traceAllocationBytes + usedSize) % samplingBytesGranularity;
-			env->setTLHSamplingTop(samplingBytesGranularity - traceBytes);
-		}
-
 		return addrBase;
 	}
 	return NULL;
