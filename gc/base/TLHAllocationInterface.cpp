@@ -211,6 +211,11 @@ MM_TLHAllocationInterface::allocateObject(MM_EnvironmentBase *env, MM_AllocateDe
 	uintptr_t sizeInBytesAllocated = (_stats.bytesAllocated(false) - _bytesAllocatedBase);
 	env->_oolTraceAllocationBytes += sizeInBytesAllocated;
 	env->_traceAllocationBytes += sizeInBytesAllocated;
+
+	if (sizeInBytesAllocated > 128*1024) {
+		OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+		omrtty_printf("MM_TLHAllocationInterface::allocateObject env=%p, sizeInBytesAllocated=%zu, env->_traceAllocationBytes=%zu, allocDescription->getContiguousBytes()=%zu\n", env, sizeInBytesAllocated, env->_traceAllocationBytes, allocDescription->getContiguousBytes());
+	}
 	return result;
 }
 
@@ -281,7 +286,12 @@ MM_TLHAllocationInterface::flushCache(MM_EnvironmentBase *env)
 {
 	MM_GCExtensionsBase *extensions = env->getExtensions();
 	
-#if defined(OMR_GC_THREAD_LOCAL_HEAP)	
+#if defined(OMR_GC_THREAD_LOCAL_HEAP)
+	/* update traceAllocationBytes with allocatedSizeInsideTLH before flushing TLH Cache */
+	uintptr_t allocatedSizeInsideTLH = env->getAllocatedSizeInsideTLH();
+	env->_oolTraceAllocationBytes += allocatedSizeInsideTLH;
+//	env->_traceAllocationBytes += allocatedSizeInsideTLH;
+
 	if (!_owningEnv->isInlineTLHAllocateEnabled()) {
 		/* Clear out realHeapTop field; tlh code below will take care of rest */
 		_owningEnv->enableInlineTLHAllocate();

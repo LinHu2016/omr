@@ -176,6 +176,9 @@ MM_TLHAllocationSupport::refresh(MM_EnvironmentBase *env, MM_AllocateDescription
 	uintptr_t usedSize = getUsedSize();
 	stats->_tlhAllocatedUsed += usedSize;
 
+//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+//	omrtty_printf("allocateTLH env=%p, stats->_tlhAllocatedUsed=%zu, stats->_tlhAllocatedFresh=%zu, stats->_tlhDiscardedBytes=%zu, getRemainingSize()=%zu, usedSize=%zu \n", env, stats->_tlhAllocatedUsed, stats->_tlhAllocatedFresh, stats->_tlhDiscardedBytes, getRemainingSize(), usedSize);
+
 	/* Try to cache the current TLH */
 	if ((NULL != getRealTop()) && (getRemainingSize() >= tlhMinimumSize)) {
 		/* Cache the current TLH because it is bigger than the minimum size */
@@ -269,6 +272,10 @@ MM_TLHAllocationSupport::refresh(MM_EnvironmentBase *env, MM_AllocateDescription
 		uintptr_t samplingBytesGranularity = env->getExtensions()->objectSamplingBytesGranularity;
 		if (!extensions->needDisableInlineAllocation() && (UDATA_MAX != samplingBytesGranularity)) {
 			uintptr_t traceBytes = (env->_traceAllocationBytes + usedSize) % samplingBytesGranularity;
+
+			OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+			omrtty_printf("allocateTLH setTLHSamplingTop() env=%p, samplingBytesGranularity=%zu, traceBytes=%zu, env->_traceAllocationBytes=%zu, usedSize=%zu\n", env, samplingBytesGranularity, traceBytes, env->_traceAllocationBytes, usedSize);
+
 			env->setTLHSamplingTop(samplingBytesGranularity - traceBytes);
 		}
 		/*
