@@ -166,7 +166,7 @@ MM_TLHAllocationInterface::allocateObject(MM_EnvironmentBase *env, MM_AllocateDe
 {
 	void *result = NULL;
 	MM_AllocationContext *ac = env->getAllocationContext();
-	_bytesAllocatedBase = _stats.bytesAllocated(false);
+	_bytesAllocatedBase = _stats.bytesAllocated();
 
 	if (NULL != ac) {
 		/* ensure that we are allowed to use the AI in this configuration in the Tarok case */
@@ -200,17 +200,21 @@ MM_TLHAllocationInterface::allocateObject(MM_EnvironmentBase *env, MM_AllocateDe
 
 	}
 
-	if ((NULL != result) && !allocDescription->isCompletedFromTlh()) {
-#if defined(OMR_GC_OBJECT_ALLOCATION_NOTIFY)
-		env->objectAllocationNotify((omrobjectptr_t)result);
-#endif /* OMR_GC_OBJECT_ALLOCATION_NOTIFY */
-		_stats._allocationBytes += allocDescription->getContiguousBytes();
-		_stats._allocationCount += 1;
-	}
+	if (NULL != result) {
+		uintptr_t sizeInBytesAllocated = allocDescription->getContiguousBytes();
+		/* Increment by bytes allocated */
+		env->_traceAllocationBytes += sizeInBytesAllocated;
 
-	uintptr_t sizeInBytesAllocated = (_stats.bytesAllocated(false) - _bytesAllocatedBase);
-	env->_oolTraceAllocationBytes += sizeInBytesAllocated;
-	env->_traceAllocationBytes += sizeInBytesAllocated;
+		if (!allocDescription->isCompletedFromTlh()) {
+#if defined(OMR_GC_OBJECT_ALLOCATION_NOTIFY)
+			env->objectAllocationNotify((omrobjectptr_t)result);
+#endif /* OMR_GC_OBJECT_ALLOCATION_NOTIFY */
+			_stats._allocationBytes += sizeInBytesAllocated;
+			_stats._allocationCount += 1;
+		}
+	}
+	env->_oolTraceAllocationBytes += (_stats.bytesAllocated() - _bytesAllocatedBase); /* Increment by bytes allocated */
+
 	return result;
 }
 
@@ -283,7 +287,7 @@ MM_TLHAllocationInterface::flushCache(MM_EnvironmentBase *env)
 	
 #if defined(OMR_GC_THREAD_LOCAL_HEAP)	
 	if (!_owningEnv->isInlineTLHAllocateEnabled()) {
-		/* Clear out realHeapTop field; tlh code below will take care of rest */
+		/* Clear out realHeapAlloc field; tlh code below will take care of rest */
 		_owningEnv->enableInlineTLHAllocate();
 	}	
 #endif /* OMR_GC_THREAD_LOCAL_HEAP */		
