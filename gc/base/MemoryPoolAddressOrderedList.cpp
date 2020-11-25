@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2019 IBM Corp. and others
+ * Copyright (c) 1991, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -410,6 +410,13 @@ MM_MemoryPoolAddressOrderedList::updateHintsBeyondEntry(MM_HeapLinkedFreeHeader 
 	}
 }
 
+//void
+//MM_MemoryPoolAddressOrderedList::reportMemoryPool(MM_EnvironmentBase *env)
+//{
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("memoryPool=%p, _heapFreeList=%p, _allocCount=%zu, _allocBytes=%zu, _freeMemorySize=%zu, _freeEntryCount=%zu, _allocDiscardedBytes=%zu, _darkMatterBytes=%zu\n",
+//			this, _heapFreeList, _allocCount, _allocBytes, _freeMemorySize, _freeEntryCount, _allocDiscardedBytes, _darkMatterBytes);
+//}
 /****************************************
  * Allocation
  ****************************************
@@ -506,6 +513,12 @@ retry:
 		_freeMemorySize -= recycleEntrySize;
 		_freeEntryCount -= 1;
 
+//		if ((0 == _freeEntryCount) && (_freeMemorySize != 0)) {
+//			OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//			omrtty_printf("internalAllocate memoryPool=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, recycleEntrySize=%zu, sizeInBytesRequired=%zu, currentFreeEntry=%p \n",
+//					this, _freeMemorySize, _freeEntryCount, recycleEntrySize, sizeInBytesRequired, currentFreeEntry);
+//		}
+//
 		/* Update discard bytes if necessary */
 		_allocDiscardedBytes += recycleEntrySize;
 
@@ -640,6 +653,12 @@ retry:
 			_freeMemorySize -= recycleEntrySize;
 			_freeEntryCount -= 1;
 
+//			if ((0 == _freeEntryCount) && (_freeMemorySize != 0)) {
+//				OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//				omrtty_printf("internalAllocateTLH memoryPool=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, recycleEntrySize=%zu, consumedSize=%zu, freeEntry=%p, freeEntrySize=%zu, maximumSizeInBytesRequired=%zu, _minimumFreeEntrySize=%zu\n",
+//						this, _freeMemorySize, _freeEntryCount, recycleEntrySize, consumedSize, freeEntry, freeEntrySize, maximumSizeInBytesRequired, _minimumFreeEntrySize);
+//			}
+//
 			_allocDiscardedBytes += recycleEntrySize;
 		}
 	} else {
@@ -647,6 +666,13 @@ retry:
 		_heapFreeList = entryNext;
 		/* also update the freeEntryCount as recycleHeapChunk would do this */
 		_freeEntryCount -= 1;
+
+//		if ((0 == _freeEntryCount) && (_freeMemorySize != 0)) {
+//			OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//			omrtty_printf("internalAllocateTLH memoryPool=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, recycleEntrySize=%zu, consumedSize=%zu, _heapFreeList=%p, freeEntry=%p, freeEntrySize=%zu, maximumSizeInBytesRequired=%zu, _minimumFreeEntrySize=%zu\n",
+//					this, _freeMemorySize, _freeEntryCount, recycleEntrySize, consumedSize, _heapFreeList, freeEntry, freeEntrySize, maximumSizeInBytesRequired, _minimumFreeEntrySize);
+//		}
+//
 	}
 
 	if (lockingRequired) {
@@ -717,8 +743,11 @@ MM_MemoryPoolAddressOrderedList::reset(Cause cause)
 
 	clearHints();
 	_heapFreeList = (MM_HeapLinkedFreeHeader *)NULL;
+	_scannableBytes = 0;
+	_nonScannableBytes = 0;
 
 	_lastFreeEntry = NULL;
+	_adjustedbytesForCardAlignment = 0;
 	resetFreeEntryAllocateStats(_largeObjectAllocateStats);
 	resetLargeObjectAllocateStats();
 }
@@ -759,6 +788,9 @@ MM_MemoryPoolAddressOrderedList::rebuildFreeListInRegion(MM_EnvironmentBase *env
 		/* we already did reset, so it's safe to call increment */
 		_largeObjectAllocateStats->incrementFreeEntrySizeClassStats(rangeSize);
 
+//		OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//		omrtty_printf("rebuildFreeListInRegion memoryPool=%p, region=%p, rangeSize=%zu _heapFreeList=%p\n", this, region, rangeSize, _heapFreeList);
+//		verifyFreeSizeCount(env);
 		TRIGGER_J9HOOK_MM_PRIVATE_REBUILD_FREE_LIST(env->getExtensions()->privateHookInterface, env->getOmrVMThread(), rangeBase, rangeTop);
 	}
 	unlock(env);
@@ -890,6 +922,11 @@ MM_MemoryPoolAddressOrderedList::expandWithRange(MM_EnvironmentBase *env, uintpt
 		_largestFreeEntry = freeEntry->getSize(); 
 	}
 
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("expandWithRange memoryPool=%p, _heapFreeList=%p, _freeMemorySize=%zu, _freeEntryCount=%zu,  expandSize=%zu, lowAddress=%p, highAddress=%p\n",
+//			this, _heapFreeList, _freeMemorySize, _freeEntryCount, expandSize, lowAddress, highAddress);
+//	verifyFreeSizeCount(env);
+
 	assume0(isMemoryPoolValid(env, true));
 }
 
@@ -981,6 +1018,10 @@ MM_MemoryPoolAddressOrderedList::contractWithRange(MM_EnvironmentBase *env, uint
 	_freeMemorySize -= totalContractSize;
 	_freeEntryCount -= contractCount;
 
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("contractWithRange memoryPool=%p, _heapFreeList=%p, _freeMemorySize=%zu, _freeEntryCount=%zu,  totalContractSize=%zu, contractCount=%zu\n",
+//			this, _heapFreeList, _freeMemorySize, _freeEntryCount, totalContractSize, contractCount);
+//
 	assume0(isMemoryPoolValid(env, true));
 	
 	return lowAddress;
@@ -1064,6 +1105,11 @@ MM_MemoryPoolAddressOrderedList::addFreeEntries(MM_EnvironmentBase *env,
 	/* Adjust the free memory data */
 	_freeMemorySize += freeListMemorySize;
 	_freeEntryCount += localFreeListMemoryCount;
+
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("addFreeEntries memoryPool=%p, _freeMemorySize=%zu, _freeEntryCount=%zu,  freeListMemorySize=%zu, localFreeListMemoryCount=%zu\n",
+//			this, _freeMemorySize, _freeEntryCount, freeListMemorySize, localFreeListMemoryCount);
+//
 }
 
 #if defined(OMR_GC_LARGE_OBJECT_AREA)
@@ -1245,6 +1291,10 @@ MM_MemoryPoolAddressOrderedList::removeFreeEntriesWithinRange(MM_EnvironmentBase
 	_freeMemorySize -= removeSize;
 	_freeEntryCount -= removeCount;
 
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("removeFreeEntriesWithinRange memoryPool=%p, _freeMemorySize=%zu, _freeEntryCount=%zu,  removeSize=%zu, removeCount=%zu\n",
+//			this, _freeMemorySize, _freeEntryCount, removeSize, removeCount);
+//
 	return true;
 }
 
@@ -1299,6 +1349,8 @@ MM_MemoryPoolAddressOrderedList::findAddressAfterFreeSize(MM_EnvironmentBase *en
 	return NULL;
 }
 #endif /* OMR_GC_LARGE_OBJECT_AREA */
+
+
 
 bool
 MM_MemoryPoolAddressOrderedList::recycleHeapChunk(
@@ -1551,6 +1603,39 @@ MM_MemoryPoolAddressOrderedList::recycleHeapChunk(void* chunkBase, void* chunkTo
 	return recycled;
 }
 
+//bool
+//MM_MemoryPoolAddressOrderedList::verifyFreeSizeCount(MM_EnvironmentBase *env)
+//{
+//	bool const compressed = compressObjectReferences();
+//	uintptr_t freeBytes = 0;
+//	uintptr_t freeCount = 0;
+//	uintptr_t largestFree = 0;
+//
+//	MM_HeapLinkedFreeHeader  *currentFreeEntry = _heapFreeList;
+//	uintptr_t currentFreeEntrySize;
+//	while(currentFreeEntry) {
+//		currentFreeEntrySize = currentFreeEntry->getSize();
+//
+//		freeBytes += currentFreeEntrySize;
+//		freeCount += 1;
+//		largestFree = OMR_MAX(largestFree, currentFreeEntrySize);
+//
+//        currentFreeEntry = currentFreeEntry->getNext(compressed);
+//	}
+//
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	/* Do statistics match free list */
+//	if (freeBytes == _freeMemorySize &&
+//		freeCount == _freeEntryCount ) {
+//		omrtty_printf("verifyFreeSizeCount true memoryPool=%p,freeCount=%zu, freeBytes=%zu\n", this,  freeCount, freeBytes);
+//		return true;
+//	} else {
+//		omrtty_printf("verifyFreeSizeCount false memoryPool=%p,freeCount=%zu, _freeEntryCount=%zu, freeBytes=%zu, _freeMemorySize=%zu, \n", this,  freeCount, _freeEntryCount, freeBytes, _freeMemorySize);
+//		return false;
+//	}
+//
+//}
+//
 /*
  * Debug routine to dump details of the current state of the freelist
  */
@@ -1664,7 +1749,7 @@ MM_MemoryPoolAddressOrderedList::recalculateMemoryPoolStatistics(MM_EnvironmentB
 	uintptr_t freeBytes = 0;
 	uintptr_t freeEntryCount = 0;
 	_largeObjectAllocateStats->getFreeEntrySizeClassStats()->resetCounts();
-	
+
 	MM_HeapLinkedFreeHeader *freeHeader = (MM_HeapLinkedFreeHeader *)getFirstFreeStartingAddr(env);
 	while (NULL != freeHeader) {
 		if (freeHeader->getSize() > largestFreeEntry) {
@@ -1672,8 +1757,8 @@ MM_MemoryPoolAddressOrderedList::recalculateMemoryPoolStatistics(MM_EnvironmentB
 		}
 		freeBytes += freeHeader->getSize();
 		freeEntryCount += 1;
-		freeHeader = freeHeader->getNext(compressed);
 		_largeObjectAllocateStats->incrementFreeEntrySizeClassStats(freeHeader->getSize());
+		freeHeader = freeHeader->getNext(compressed);
 	}
 	
 	updateMemoryPoolStatistics(env, freeBytes, freeEntryCount, largestFreeEntry);
