@@ -38,6 +38,7 @@
 #include "MemoryPoolAddressOrderedListBase.hpp"
 #include "SweepPoolManagerAddressOrderedListBase.hpp"
 #include "ModronAssertions.h"
+#include "CycleState.hpp"
 
 /**
  * Initialize any internal structures.
@@ -172,7 +173,9 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 		sweepState->_sweepFreeBytes += leadingFreeEntrySize;
  		sweepState->updateLargestFreeEntry(previousFreeEntrySize, previousPreviousFreeEntry);
 		memoryPool->getLargeObjectAllocateStats()->incrementFreeEntrySizeClassStats(previousFreeEntrySize);
-
+		if ((_extensions->isVLHGC()) && (env->_cycleState->_noCompactionAfterSweep)) {
+			memoryPool->setNeedClearCardForConnectFreeEntry(true);
+		}
 		/* Consume the leading entry */
 		leadingFreeEntry = NULL;
 	}
@@ -202,11 +205,18 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 						previousFreeEntrySize,
 						previousConnectChunk->trailingFreeCandidate);
 
+				if (memoryPool->doesNeedClearCardForConnectFreeEntry()) {
+					memoryPool->cleanCardsForFreeEntry(env, (void*)previousFreeEntry, ((uint8_t*)previousFreeEntry + previousFreeEntrySize), false);
+//					memoryPool->setNeedClearCardForConnectFreeEntry(false);
+				}
 				connectChunkPostProcess(chunk, sweepState, (MM_HeapLinkedFreeHeader *)previousConnectChunk->trailingFreeCandidate, previousFreeEntry);
 				/* only for SPMSAOL */
 				previousPreviousFreeEntry = previousFreeEntry;
 				previousFreeEntry = (MM_HeapLinkedFreeHeader *)previousConnectChunk->trailingFreeCandidate;
 				previousFreeEntrySize = jointFreeSize;
+				if ((_extensions->isVLHGC()) && (env->_cycleState->_noCompactionAfterSweep)) {
+					memoryPool->setNeedClearCardForConnectFreeEntry(true);
+				}
 
 				/* Maintain the free bytes/holes count in the allocate profile for expansion/contraction purposes */
 				if(0 != jointFreeSize) {
@@ -236,10 +246,19 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 						previousConnectChunk->trailingFreeCandidate);
 
 				connectChunkPostProcess(chunk, sweepState, (MM_HeapLinkedFreeHeader *)previousConnectChunk->trailingFreeCandidate, previousFreeEntry);
+
+				if (memoryPool->doesNeedClearCardForConnectFreeEntry()) {
+					memoryPool->cleanCardsForFreeEntry(env, (void*)previousFreeEntry, ((uint8_t*)previousFreeEntry + previousFreeEntrySize), false);
+//					memoryPool->setNeedClearCardForConnectFreeEntry(false);
+				}
+
 				/* only for SPMSAOL */
 				previousPreviousFreeEntry = previousFreeEntry;
 				previousFreeEntry = (MM_HeapLinkedFreeHeader *)previousConnectChunk->trailingFreeCandidate;
 				previousFreeEntrySize = previousConnectChunk->trailingFreeCandidateSize;
+				if ((_extensions->isVLHGC()) && (env->_cycleState->_noCompactionAfterSweep)) {
+					memoryPool->setNeedClearCardForConnectFreeEntry(true);
+				}
 
 				/* Maintain the free bytes/holes count in the allocate profile for expansion/contraction purposes */
 				if(0 != previousConnectChunk->trailingFreeCandidateSize) {
@@ -279,11 +298,21 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 						leadingFreeEntry);
 
 				connectChunkPostProcess(chunk, sweepState, leadingFreeEntry, previousFreeEntry);
+
+//				omrtty_printf("leadingFreeEntry=%p, leadingFreeEntrySize=%zu \n", leadingFreeEntry, leadingFreeEntrySize);
+
+				if (memoryPool->doesNeedClearCardForConnectFreeEntry()) {
+					memoryPool->cleanCardsForFreeEntry(env, (void*)previousFreeEntry, ((uint8_t*)previousFreeEntry + previousFreeEntrySize), false);
+//					memoryPool->setNeedClearCardForConnectFreeEntry(false);
+				}
+
 				/* only for SPMSAOL */
 				previousPreviousFreeEntry = previousFreeEntry;
 				previousFreeEntry = leadingFreeEntry;
 				previousFreeEntrySize = leadingFreeEntrySize;
-
+				if ((_extensions->isVLHGC()) && (env->_cycleState->_noCompactionAfterSweep)) {
+					memoryPool->setNeedClearCardForConnectFreeEntry(true);
+				}
 				/* Maintain the free bytes/holes count in the allocate profile for expansion/contraction purposes */
 				if(0 != leadingFreeEntrySize) {
 					sweepState->_sweepFreeBytes += leadingFreeEntrySize;
@@ -317,6 +346,13 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 
 		/* Set split candidate information */
 		connectChunkPostProcess(chunk, sweepState, chunk->freeListHead, previousFreeEntry);
+
+//		omrtty_printf("chunk->freeListHead=%p, \n", chunk->freeListHead);
+
+		if (memoryPool->doesNeedClearCardForConnectFreeEntry()) {
+			memoryPool->cleanCardsForFreeEntry(env, (void*)previousFreeEntry, ((uint8_t*)previousFreeEntry + previousFreeEntrySize), false);
+			memoryPool->setNeedClearCardForConnectFreeEntry(false);
+		}
 
 		/* Adjusted the largest free entry found in chunk for the sweep state */
 		updateLargestFreeEntryInChunk(chunk, sweepState, previousFreeEntry);
@@ -383,9 +419,19 @@ MM_SweepPoolManagerAddressOrderedListBase::flushFinalChunk(
 					sweepState->_connectPreviousFreeEntrySize,
 					sweepState->_connectPreviousChunk->trailingFreeCandidate);
 
+//			OMRPORT_ACCESS_FROM_OMRPORT(envModron->getPortLibrary());
+//			omrtty_printf("flushFinalChunk fold it into the free list \n");
+
+			if (memoryPool->doesNeedClearCardForConnectFreeEntry()) {
+				memoryPool->cleanCardsForFreeEntry(envModron, (void*)sweepState->_connectPreviousFreeEntry, ((uint8_t*)sweepState->_connectPreviousFreeEntry + sweepState->_connectPreviousFreeEntrySize), false);
+			}
+
 			sweepState->_connectPreviousPreviousFreeEntry = sweepState->_connectPreviousFreeEntry;
 			sweepState->_connectPreviousFreeEntry = (MM_HeapLinkedFreeHeader *)sweepState->_connectPreviousChunk->trailingFreeCandidate;
 			sweepState->_connectPreviousFreeEntrySize = sweepState->_connectPreviousChunk->trailingFreeCandidateSize;
+			if ((_extensions->isVLHGC()) && (envModron->_cycleState->_noCompactionAfterSweep)) {
+				memoryPool->setNeedClearCardForConnectFreeEntry(true);
+			}
 			Assert_MM_true(sweepState->_connectPreviousFreeEntry != sweepState->_connectPreviousChunk->leadingFreeCandidate);
 
 			sweepState->_sweepFreeBytes += sweepState->_connectPreviousChunk->trailingFreeCandidateSize;
@@ -411,6 +457,14 @@ MM_SweepPoolManagerAddressOrderedListBase::connectFinalChunk(
 		((MM_MemoryPoolAddressOrderedListBase *)memoryPool)->connectFinalMemoryToPool(envModron,
 				sweepState->_connectPreviousFreeEntry,
 				sweepState->_connectPreviousFreeEntrySize);
+
+//		OMRPORT_ACCESS_FROM_OMRPORT(envModron->getPortLibrary());
+//		omrtty_printf("connectFinalChunk\n");
+
+		if (((MM_MemoryPoolAddressOrderedListBase *)memoryPool)->doesNeedClearCardForConnectFreeEntry()) {
+			((MM_MemoryPoolAddressOrderedListBase *)memoryPool)->cleanCardsForFreeEntry(envModron, (void*)sweepState->_connectPreviousFreeEntry, ((uint8_t*)sweepState->_connectPreviousFreeEntry + sweepState->_connectPreviousFreeEntrySize), false);
+			((MM_MemoryPoolAddressOrderedListBase *)memoryPool)->setNeedClearCardForConnectFreeEntry(false);
+		}
 
  		sweepState->updateLargestFreeEntry(sweepState->_connectPreviousFreeEntrySize, sweepState->_connectPreviousPreviousFreeEntry);
 	}
@@ -480,12 +534,10 @@ MM_SweepPoolManagerAddressOrderedListBase::addFreeMemory(MM_EnvironmentBase *env
 		MM_MemoryPoolAddressOrderedListBase *memoryPool = (MM_MemoryPoolAddressOrderedListBase *)sweepChunk->memoryPool;
 
 		if(memoryPool->connectInnerMemoryToPool(env, address, heapFreeByteCount, sweepChunk->freeListTail)) {
-
 #if defined(J9MODRON_ALLOCATION_MANAGER_TRACE)
 			OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
 			omrtty_printf("SW: Free entry %p %p\n", address, ((uint8_t *)address) + heapFreeByteCount);
 #endif
-
 			/* If the hole is first in this chunk, make it the header */
 			if(NULL == sweepChunk->freeListTail) {
 				sweepChunk->freeListHead = (MM_HeapLinkedFreeHeader *)address;
@@ -494,6 +546,9 @@ MM_SweepPoolManagerAddressOrderedListBase::addFreeMemory(MM_EnvironmentBase *env
 
 			/* Maintain the free bytes/holes count in the chunk for heap expansion/contraction purposes (will be gathered up in the allocate profile) */
 			if(0 != heapFreeByteCount) {
+				if ((_extensions->isVLHGC()) && (env->_cycleState->_noCompactionAfterSweep)) {
+					memoryPool->cleanCardsForFreeEntry(env, address, ((uint8_t*)address + heapFreeByteCount), true);
+				}
 				sweepChunk->freeBytes += heapFreeByteCount;
 				sweepChunk->freeHoles += 1;
 //				sweepChunk->_largestFreeEntry = max(sweepChunk->_largestFreeEntry , heapFreeByteCount);

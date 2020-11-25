@@ -127,6 +127,7 @@ MM_MemoryPoolAddressOrderedListBase::connectInnerMemoryToPool(MM_EnvironmentBase
 	if (size >= getMinimumFreeEntrySize()) {
 		/* Build the free header */
 		createFreeEntry(env, (MM_HeapLinkedFreeHeader*)address, (uint8_t*)address + size, (MM_HeapLinkedFreeHeader*)previousFreeEntry, NULL);
+//		cleanCardsForFreeEntry(env, address, ((uint8_t*)address + size));
 		result = true;
 	}
 	return result;
@@ -148,6 +149,7 @@ MM_MemoryPoolAddressOrderedListBase::connectOuterMemoryToPool(MM_EnvironmentBase
 
 	/* Build the free header */
 	createFreeEntry(env, (MM_HeapLinkedFreeHeader*)address, (uint8_t*)address + size, NULL, (MM_HeapLinkedFreeHeader*)nextFreeEntry);
+//	cleanCardsForFreeEntry(env, address, ((uint8_t*)address + size));
 
 	if (NULL == *_referenceHeapFreeList) {
 		*_referenceHeapFreeList = (MM_HeapLinkedFreeHeader*)nextFreeEntry;
@@ -168,6 +170,7 @@ MM_MemoryPoolAddressOrderedListBase::connectFinalMemoryToPool(MM_EnvironmentBase
 
 	/* Build the free header */
 	createFreeEntry(env, (MM_HeapLinkedFreeHeader*)address, (uint8_t*)address + size);
+//	cleanCardsForFreeEntry(env, address, ((uint8_t*)address + size));
 }
 
 /**

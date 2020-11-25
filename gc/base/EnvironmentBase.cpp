@@ -89,7 +89,7 @@ MM_EnvironmentBase::initialize(MM_GCExtensionsBase *extensions)
 	setEnvironmentId(MM_AtomicOperations::add(&extensions->currentEnvironmentCount, 1) - 1);
 	setAllocationColor(extensions->newThreadAllocationColor);
 
-	if (extensions->isStandardGC()) {
+	if (extensions->isStandardGC() || extensions->isVLHGC()) {
 		/* pass veryLargeObjectThreshold = 0 to initialize limited size of veryLargeEntryPool for thread (to reduce footprint), 
 		 * but if the threshold is bigger than maxHeap size, we would pass orignal threshold to indicate no veryLargeEntryPool needed 
 		 */

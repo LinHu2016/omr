@@ -58,6 +58,8 @@ protected:
 	MM_SweepPoolManagerAddressOrderedListBase* _sweepPoolManager;		/**< pointer to SweepPoolManager class */
 	MM_HeapLinkedFreeHeader *_lastFreeEntry;							/**< address of the last free entry in the pool; valid after compact; NOT maintained during allocation */ 
 
+	uintptr_t _adjustedbytesForCardAlignment;		/* due to Dirty Card Alignment, number of free memory bytes can not be reused as survivor bytes(it should be counted as a part of darkmatter bytes, balanced gc only) */
+	bool _needClearCardForConnectFreeEntry;
 public:
 	
 /*
@@ -66,20 +68,6 @@ public:
 private:
 
 protected:
-/**
- * Update memory pool statistical data
- * 
- * @param freeBytes free bytes added
- * @param freeEntryCount free memory elements added
- * @param largestFreeEntry largest free memory element size 
- */
- 	void updateMemoryPoolStatistics(MM_EnvironmentBase *env, uintptr_t freeBytes, uintptr_t freeEntryCount, uintptr_t largestFreeEntry)
-	{
-		setFreeMemorySize(freeBytes);
-		setFreeEntryCount(freeEntryCount);
-		setLargestFreeEntry(largestFreeEntry);
-	}
-
 	MMINLINE bool internalRecycleHeapChunk(void *addrBase, void *addrTop, MM_HeapLinkedFreeHeader *next)
 	{
 		/* Determine if the heap chunk belongs in the free list */
@@ -201,6 +189,23 @@ protected:
 	}
 	
 public:
+	/**
+	 * Update memory pool statistical data
+	 *
+	 * @param freeBytes free bytes added
+	 * @param freeEntryCount free memory elements added
+	 * @param largestFreeEntry largest free memory element size
+	 */
+	void updateMemoryPoolStatistics(MM_EnvironmentBase *env, uintptr_t freeBytes, uintptr_t freeEntryCount, uintptr_t largestFreeEntry)
+	{
+		setFreeMemorySize(freeBytes);
+		setFreeEntryCount(freeEntryCount);
+		setLargestFreeEntry(largestFreeEntry);
+		OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+		omrtty_printf("updateMemoryPoolStatistics freeBytes=%zu, freeEntryCount=%zu, largestFreeEntry=%zu, _adjustedbytesForCardAlignment=%zu\n", freeBytes, freeEntryCount, largestFreeEntry, _adjustedbytesForCardAlignment);
+
+	}
+
 	virtual void acquireResetLock(MM_EnvironmentBase* env);
 	virtual void releaseResetLock(MM_EnvironmentBase* env);
 
@@ -243,6 +248,26 @@ public:
 	virtual void printCurrentFreeList(MM_EnvironmentBase* env, const char* area)=0;
 
 	virtual void recalculateMemoryPoolStatistics(MM_EnvironmentBase* env)=0;
+
+	void resetAdjustedBytesForCardAlignment()
+	{
+		_adjustedbytesForCardAlignment = 0;
+	}
+
+	virtual void cleanCardsForFreeEntry(MM_EnvironmentBase *env, void *addrBase, void *addrTop, bool needSync = false)
+	{
+	}
+
+	void setNeedClearCardForConnectFreeEntry(bool needClearCard)
+	{
+		_needClearCardForConnectFreeEntry = needClearCard;
+	}
+
+	bool doesNeedClearCardForConnectFreeEntry()
+	{
+		return _needClearCardForConnectFreeEntry;
+	}
+
 #if defined(OMR_GC_IDLE_HEAP_MANAGER)
 	uintptr_t releaseFreeEntryMemoryPages(MM_EnvironmentBase* env, MM_HeapLinkedFreeHeader* freeEntry);
 #endif
@@ -255,6 +280,8 @@ public:
 		,_sweepPoolState(NULL)
 		,_sweepPoolManager(NULL)
 		,_lastFreeEntry(NULL)
+		,_adjustedbytesForCardAlignment(0)
+		,_needClearCardForConnectFreeEntry(false)
 	{
 //		_typeId = __FUNCTION__;
 	};
@@ -265,6 +292,8 @@ public:
 		,_sweepPoolState(NULL)
 		,_sweepPoolManager(NULL)
 		,_lastFreeEntry(NULL)
+		,_adjustedbytesForCardAlignment(0)
+		,_needClearCardForConnectFreeEntry(false)
 	{
 //		_typeId = __FUNCTION__;
 	};

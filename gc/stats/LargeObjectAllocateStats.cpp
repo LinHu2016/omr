@@ -989,7 +989,7 @@ MM_LargeObjectAllocateStats::updateFreeEntrySizeClassStats(uintptr_t freeEntrySi
 {
 	uintptr_t returnSize = 0;
 	if (sizeClassIndex >= _veryLargeEntrySizeClass) {
-		if ((NULL != curr) && (freeEntrySize == curr->_size)) {
+	if ((NULL != curr) && (freeEntrySize == curr->_size)) {
 			curr->_count += count;
 
 			if (0 == curr->_count) {
