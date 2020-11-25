@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2015 IBM Corp. and others
+ * Copyright (c) 1991, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -32,6 +32,7 @@
 #include "MemoryPoolAddressOrderedListBase.hpp"
 #include "HeapRegionDescriptor.hpp"
 #include "EnvironmentBase.hpp"
+#include "AtomicOperations.hpp"
 
 class MM_AllocateDescription;
 #if defined(OMR_GC_CONCURRENT_SWEEP)
@@ -60,6 +61,10 @@ private:
 	
 	MM_LargeObjectAllocateStats *_largeObjectCollectorAllocateStats;  /**< Same as _largeObjectAllocateStats except specifically for collector allocates */
 
+	/* for Balanced GC only */
+	uintptr_t _scannableBytes;	/**< estimate of scannable bytes in the pool (only out of sampled objects) */
+	uintptr_t _nonScannableBytes; /**< estimate of non-scannable bytes in the pool (only out of sampled objects) */
+
 protected:
 public:
 	
@@ -75,8 +80,6 @@ private:
 	void updateHintsBeyondEntry(MM_HeapLinkedFreeHeader *freeEntry);
 	void *internalAllocate(MM_EnvironmentBase *env, uintptr_t sizeInBytesRequired, bool lockingRequired, MM_LargeObjectAllocateStats *largeObjectAllocateStats);
 	bool internalAllocateTLH(MM_EnvironmentBase *env, uintptr_t maximumSizeInBytesRequired, void * &addrBase, void * &addrTop, bool lockingRequired, MM_LargeObjectAllocateStats *largeObjectAllocateStats);
-
-	bool recycleHeapChunk(void *addrBase, void *addrTop, MM_HeapLinkedFreeHeader *previousFreeEntry, MM_HeapLinkedFreeHeader *nextFreeEntry);	
 	
 protected:
 public:
@@ -114,6 +117,7 @@ public:
 	virtual void *contractWithRange(MM_EnvironmentBase *env, uintptr_t contractSize, void *lowAddress, void *highAddress);
 
 	bool recycleHeapChunk(void* chunkBase, void* chunkTop);
+	bool recycleHeapChunk(void *addrBase, void *addrTop, MM_HeapLinkedFreeHeader *previousFreeEntry, MM_HeapLinkedFreeHeader *nextFreeEntry);
 
 	virtual void *findFreeEntryEndingAtAddr(MM_EnvironmentBase *env, void *addr);
 	virtual uintptr_t getAvailableContractionSizeForRangeEndingAt(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription, void *lowAddr, void *highAddr);
@@ -146,6 +150,82 @@ public:
 	virtual uintptr_t releaseFreeMemoryPages(MM_EnvironmentBase* env);
 #endif
 
+	/* for Balanced GC only */
+	/**
+	 * Increase the scannable/non-scannable estimate for the receiver by the specified amount
+	 * @param scannableBytes the number of bytes to increase for scannable objects
+	 * @param non-scannableBytes the number of bytes to increase for scannable objects
+	 */
+	MMINLINE void incrementScannableBytes(uintptr_t scannableBytes, uintptr_t nonScannableBytes) { _scannableBytes += scannableBytes; _nonScannableBytes += nonScannableBytes; }
+	/**
+	 * @return the recorded estimate of scannable in the receiver
+	 */
+	MMINLINE uintptr_t getScannableBytes() { return _scannableBytes; }
+	/**
+	 * @return the recorded estimate of non-scannable in the receiver
+	 */
+	MMINLINE uintptr_t getNonScannableBytes() { return _nonScannableBytes; }
+
+	/**
+	 * remove a free entry from freelist
+	 */
+	void removeFromFreeList(void *addrBase, void *addrTop, MM_HeapLinkedFreeHeader *previousFreeEntry, MM_HeapLinkedFreeHeader *nextFreeEntry)
+	{
+		bool const compressed = compressObjectReferences();
+		uintptr_t freeEntrySize = ((uintptr_t)addrTop) - ((uintptr_t)addrBase);
+		MM_HeapLinkedFreeHeader::fillWithHoles(addrBase, freeEntrySize, compressed);
+		if (previousFreeEntry) {
+			previousFreeEntry->setNext(nextFreeEntry, compressed);
+		}else {
+			_heapFreeList = nextFreeEntry;
+		}
+	}
+
+	void fillWithHoles(void *addrBase, void *addrTop)
+	{
+		bool const compressed = compressObjectReferences();
+		MM_HeapLinkedFreeHeader::fillWithHoles(addrBase, ((uintptr_t)addrTop) - ((uintptr_t)addrBase), compressed);
+	}
+
+	MMINLINE uintptr_t getABSDarkMatterBytes()
+	{
+		return _darkMatterBytes;
+	}
+
+	MMINLINE uintptr_t getABSActualFreeMemorySize()
+	{
+		return _freeMemorySize;
+	}
+
+	MMINLINE uintptr_t getAdjustedbytesForCardAlignment()
+	{
+		return _adjustedbytesForCardAlignment;
+	}
+
+	MMINLINE void setAdjustedbytesForCardAlignment(uintptr_t adjustedbytes, bool needSync)
+	{
+		if (needSync) {
+			MM_AtomicOperations::add(&(_adjustedbytesForCardAlignment), adjustedbytes);
+		} else {
+			_adjustedbytesForCardAlignment += adjustedbytes;
+		}
+	}
+
+
+	MMINLINE virtual uintptr_t getDarkMatterBytes()
+	{
+		return _darkMatterBytes + _adjustedbytesForCardAlignment;
+	}
+
+	MMINLINE virtual uintptr_t getActualFreeMemorySize()
+	{
+		return _freeMemorySize - _adjustedbytesForCardAlignment;
+	}
+
+	MMINLINE uintptr_t getFreeMemoryAndDarkMatterBytes() {
+		return getActualFreeMemorySize() + getDarkMatterBytes();
+	}
+
 	/**
 	 * Create a MemoryPoolAddressOrderedList object.
 	 */
@@ -153,6 +233,8 @@ public:
 		MM_MemoryPoolAddressOrderedListBase(env, minimumFreeEntrySize)
 		,_heapFreeList(NULL)
 		,_largeObjectCollectorAllocateStats(NULL)
+		,_scannableBytes(0)
+		,_nonScannableBytes(0)
 	{
 		_typeId = __FUNCTION__;
 	};
@@ -161,6 +243,8 @@ public:
 		MM_MemoryPoolAddressOrderedListBase(env, minimumFreeEntrySize, name)
 		,_heapFreeList(NULL)
 		,_largeObjectCollectorAllocateStats(NULL)
+		,_scannableBytes(0)
+		,_nonScannableBytes(0)
 	{
 		_typeId = __FUNCTION__;
 	};
