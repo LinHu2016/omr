@@ -41,6 +41,8 @@
 #include "LargeObjectAllocateStats.hpp"
 #include "HeapLinkedFreeHeader.hpp"
 #include "Heap.hpp"
+#include "CardTable.hpp"
+#include "AtomicOperations.hpp"
 
 #if defined(OMR_VALGRIND_MEMCHECK)
 #include "MemcheckWrapper.hpp"
@@ -717,8 +719,12 @@ MM_MemoryPoolAddressOrderedList::reset(Cause cause)
 
 	clearHints();
 	_heapFreeList = (MM_HeapLinkedFreeHeader *)NULL;
+	_scannableBytes = 0;
+	_nonScannableBytes = 0;
 
 	_lastFreeEntry = NULL;
+	_adjustedbytesForCardAlignment = 0;
+	_needClearCardForConnectFreeEntry = false;
 	resetFreeEntryAllocateStats(_largeObjectAllocateStats);
 	resetLargeObjectAllocateStats();
 }
@@ -1300,6 +1306,8 @@ MM_MemoryPoolAddressOrderedList::findAddressAfterFreeSize(MM_EnvironmentBase *en
 }
 #endif /* OMR_GC_LARGE_OBJECT_AREA */
 
+
+
 bool
 MM_MemoryPoolAddressOrderedList::recycleHeapChunk(
 	void *addrBase,
@@ -1499,6 +1507,93 @@ MM_MemoryPoolAddressOrderedList::unlock(MM_EnvironmentBase *env)
 	_heapLock.release();
 }
 
+bool
+MM_MemoryPoolAddressOrderedList::coalesceHeapChunk(MM_EnvironmentBase *env, void* chunkBase, void* chunkTop)
+{
+	bool coalesced = false;
+
+	_heapLock.acquire();
+	if (NULL != _heapFreeList) {
+		bool const compressed = compressObjectReferences();
+		void *addrBase = chunkBase;
+		void *addrTop = chunkTop;
+
+//		OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//		omrtty_printf("env=%p, coalesceHeapChunk start chunkBase=%p, chunkTop=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, _heapFreeList=%p\n", env, chunkBase, chunkTop, _freeMemorySize, _freeEntryCount, _heapFreeList);
+
+		MM_HeapLinkedFreeHeader  *currentFreeEntry = _heapFreeList;
+		MM_HeapLinkedFreeHeader  *next = NULL;
+
+		if (((uintptr_t)chunkBase < (uintptr_t)currentFreeEntry)) {
+			if ((uintptr_t)chunkTop == (uintptr_t)currentFreeEntry) {
+				addrTop = (void *)((uintptr_t)addrTop + currentFreeEntry->getSize());
+				_freeEntryCount -= 1;
+				_largeObjectAllocateStats->decrementFreeEntrySizeClassStats(currentFreeEntry->getSize());
+				next = currentFreeEntry->getNext(compressed);
+				coalesced = true;
+			}
+		} else {
+			/* Find point chunk should be coalesced and coalesce */
+			while(NULL != currentFreeEntry) {
+				next = currentFreeEntry->getNext(compressed);
+				/* Have we reached end of list ? */
+				if (NULL == next ) {
+					if (((uintptr_t)currentFreeEntry + currentFreeEntry->getSize()) == (uintptr_t)chunkBase) {
+						/* Chunk needs coalescing at END of list */
+						addrBase = (void *)currentFreeEntry;
+						_freeEntryCount -= 1;
+						_largeObjectAllocateStats->decrementFreeEntrySizeClassStats(currentFreeEntry->getSize());
+						coalesced = true;
+					}
+					break;
+				} else if ((uintptr_t)chunkBase < (uintptr_t)next) {
+					if ((((uintptr_t)currentFreeEntry + currentFreeEntry->getSize()) == (uintptr_t)chunkBase) ||
+						((uintptr_t)chunkTop == (uintptr_t)next)) {
+						/* Coalesce chunk between current entry and next one */
+						if (((uintptr_t)currentFreeEntry + currentFreeEntry->getSize()) == (uintptr_t)chunkBase) {
+							addrBase = (void *)currentFreeEntry;
+							_freeEntryCount -= 1;
+							_largeObjectAllocateStats->decrementFreeEntrySizeClassStats(currentFreeEntry->getSize());
+						}
+						if ((uintptr_t)chunkTop == (uintptr_t)next) {
+							addrTop = (void *)((uintptr_t)addrTop + next->getSize());
+							_freeEntryCount -= 1;
+							_largeObjectAllocateStats->decrementFreeEntrySizeClassStats(next->getSize());
+							next = next->getNext(compressed);
+						}
+						coalesced = true;
+					}
+					break;
+				}
+				currentFreeEntry = next;
+			}
+		}
+		if (coalesced) {
+			internalRecycleHeapChunk(addrBase, addrTop, next);
+			_freeMemorySize += (uintptr_t)chunkTop - (uintptr_t)chunkBase;;
+			_freeEntryCount += 1;
+			_largeObjectAllocateStats->incrementFreeEntrySizeClassStats((uintptr_t)addrTop - (uintptr_t)addrBase);
+			if ((uintptr_t)addrBase < (uintptr_t)_heapFreeList) {
+				_heapFreeList = (MM_HeapLinkedFreeHeader *)addrBase;
+			}
+//			omrtty_printf("env=%p, coalesceHeapChunk end addrBase=%p, addrTop=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, _heapFreeList=%p\n", env, addrBase, addrTop, _freeMemorySize, _freeEntryCount, _heapFreeList);
+		}
+	}
+	_heapLock.release();
+
+	return coalesced;
+}
+
+//bool
+//MM_MemoryPoolAddressOrderedList::recycleHeapChunk(MM_EnvironmentBase *env, void* chunkBase, void* chunkTop)
+//{
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("env=%p, recycleHeapChunk start chunkBase=%p, chunkTop=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, _heapFreeList=%p\n", env, chunkBase, chunkTop, _freeMemorySize, _freeEntryCount, _heapFreeList);
+//	bool ret = recycleHeapChunk(chunkBase, chunkTop);
+//	omrtty_printf("env=%p, recycleHeapChunk end chunkBase=%p, chunkTop=%p, _freeMemorySize=%zu, _freeEntryCount=%zu, _heapFreeList=%p\n", env, chunkBase, chunkTop, _freeMemorySize, _freeEntryCount, _heapFreeList);
+//	return ret;
+//}
+
 /**
  * Insert Chunk into correct position on the free list.
  * @return true if recycle was successful, false if not.
@@ -1664,7 +1759,7 @@ MM_MemoryPoolAddressOrderedList::recalculateMemoryPoolStatistics(MM_EnvironmentB
 	uintptr_t freeBytes = 0;
 	uintptr_t freeEntryCount = 0;
 	_largeObjectAllocateStats->getFreeEntrySizeClassStats()->resetCounts();
-	
+
 	MM_HeapLinkedFreeHeader *freeHeader = (MM_HeapLinkedFreeHeader *)getFirstFreeStartingAddr(env);
 	while (NULL != freeHeader) {
 		if (freeHeader->getSize() > largestFreeEntry) {
@@ -1672,8 +1767,8 @@ MM_MemoryPoolAddressOrderedList::recalculateMemoryPoolStatistics(MM_EnvironmentB
 		}
 		freeBytes += freeHeader->getSize();
 		freeEntryCount += 1;
-		freeHeader = freeHeader->getNext(compressed);
 		_largeObjectAllocateStats->incrementFreeEntrySizeClassStats(freeHeader->getSize());
+		freeHeader = freeHeader->getNext(compressed);
 	}
 	
 	updateMemoryPoolStatistics(env, freeBytes, freeEntryCount, largestFreeEntry);
@@ -1696,3 +1791,45 @@ MM_MemoryPoolAddressOrderedList::releaseFreeMemoryPages(MM_EnvironmentBase* env)
 	return releasedBytes;
 }
 #endif
+
+void *
+MM_MemoryPoolAddressOrderedList::alignWithCard(void *address, bool toFloor, uintptr_t alignmentMultiple)
+{
+	uintptr_t alignmentMask = alignmentMultiple - 1;
+	uintptr_t newSum = (uintptr_t)address + alignmentMask;
+	uintptr_t alignedValue = newSum & ~alignmentMask;
+	if (((uintptr_t) address != alignedValue) && toFloor) {
+		alignedValue -= alignmentMultiple;
+	}
+
+	return (void *) alignedValue;
+}
+
+void
+MM_MemoryPoolAddressOrderedList::cleanCardsForFreeEntry(MM_EnvironmentBase *env, void *addrBase, void *addrTop, bool needSync)
+{
+	if (NULL == addrBase) {
+		return;
+	}
+	uintptr_t adjustedbytes = 0;
+	MM_CardTable *cardTable = _extensions->cardTable;
+	void* addrBaseAligned = alignWithCard(addrBase, false, CARD_SIZE);
+	void* addrTopAligned = alignWithCard(addrTop, true, CARD_SIZE);
+	adjustedbytes += ((uintptr_t)addrTop - (uintptr_t)addrBase);
+	if (((uintptr_t)addrTopAligned - (uintptr_t)addrBaseAligned) >= getMinimumFreeEntrySize()) {
+		Card *lowCard = cardTable->heapAddrToCardAddr(env, addrBaseAligned);
+		Card *highCard = cardTable->heapAddrToCardAddr(env, addrTopAligned);
+		adjustedbytes -= ((uintptr_t)addrTopAligned - (uintptr_t)addrBaseAligned);
+		memset(lowCard, CARD_CLEAN, (uintptr_t)highCard - (uintptr_t)lowCard);
+	}
+	if (0 != adjustedbytes) {
+		if (needSync) {
+			MM_AtomicOperations::add(&_adjustedbytesForCardAlignment, adjustedbytes);
+		} else {
+			_adjustedbytesForCardAlignment += adjustedbytes;
+		}
+	}
+//	OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+//	omrtty_printf("mempool=%p, cleanCardsForFreeEntry addrBase=%p, addrTop=%p, size=%zu, AlignedSize=%zu, adjustedbytes=%zu, addrTopAligned=%p, addrBaseAligned=%p\n",
+//			this, addrBase, addrTop, (uintptr_t)addrTop-(uintptr_t)addrBase, (uintptr_t)addrTopAligned-(uintptr_t)addrBaseAligned, adjustedbytes, addrTopAligned, addrBaseAligned);
+}

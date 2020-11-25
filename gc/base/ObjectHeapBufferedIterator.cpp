@@ -96,7 +96,8 @@ GC_ObjectHeapBufferedIterator::getPopulator()
 		populator = &_emptyListPopulator;
 		break;
 	case MM_HeapRegionDescriptor::BUMP_ALLOCATED:
-		populator = &_bumpAllocatedListPopulator;
+//		populator = &_bumpAllocatedListPopulator;
+		populator = &_addressOrderedListPopulator;
 		break;
 	case MM_HeapRegionDescriptor::ADDRESS_ORDERED:
 		populator = &_addressOrderedListPopulator;

@@ -47,7 +47,6 @@ class MM_HeapLinkedFreeHeader;
 class MM_SweepPoolManagerAddressOrderedListBase : public MM_SweepPoolManager
 {
 private:
-
 protected:
 
 	MMINLINE void calculateTrailingDetails(MM_ParallelSweepChunk *sweepChunk, uintptr_t *trailingCandidate, uintptr_t trailingCandidateSlotCount);
