@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2020 IBM Corp. and others
+ * Copyright (c) 1991, 2021 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -207,6 +207,23 @@ public:
 	 */
 	bool canMemoryBeReleased(MM_EnvironmentBase *env, void *low, void *high);
 	
+	/**
+	 * alignment the address with CARD_SIZE
+	 * @param toFloor = true, align to floor; =false, align to ceiling
+	 * @param alignmentMultiple The multiple to which the _allocatePointer must be aligned (must be a power of 2)
+	 */
+	static void* alignWithCard(void *address, bool toFloor, uintptr_t alignmentMultiple)
+	{
+		uintptr_t alignmentMask = alignmentMultiple - 1;
+		uintptr_t newSum = (uintptr_t)address + alignmentMask;
+		uintptr_t alignedValue = newSum & ~alignmentMask;
+		if (((uintptr_t) address != alignedValue) && toFloor) {
+			alignedValue -= alignmentMultiple;
+		}
+
+		return (void *) alignedValue;
+	}
+
 	/**
 	 * Free the card table instance.
 	 * @param[in] env The thread shutting down the collector
