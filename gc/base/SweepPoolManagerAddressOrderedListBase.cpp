@@ -48,7 +48,10 @@
 bool
 MM_SweepPoolManagerAddressOrderedListBase::initialize(MM_EnvironmentBase *env)
 {
-	return MM_SweepPoolManager::initialize(env);
+	if (!MM_SweepPoolManager::initialize(env)) {
+		return false;
+	}
+	return true;
 }
 
 /**
@@ -190,7 +193,7 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 			/* The trailing/leading space forms a contiguous chunk - check if it belongs on the free list, abandon otherwise */
 
 			uintptr_t jointFreeSize = leadingFreeEntrySize + previousConnectChunk->trailingFreeCandidateSize;
-			if (previousConnectChunk->isFreeSizeEligibleForRecycling(jointFreeSize)) {
+			if (isEligibleForFreeMemory(env, memoryPool, previousConnectChunk->trailingFreeCandidate, jointFreeSize)) {
 				/* Free list candidate has been found - attach it to the free list */
 #if defined(J9MODRON_SWEEP_SCHEME_CONNECT_CHUNKS_TRACE)
 				omrtty_printf("CC: trailing/leading merged %p(+%p) + %p(+%p)\n", previousConnectChunk->trailingFreeCandidate, previousConnectChunk->trailingFreeCandidateSize, leadingFreeEntry, leadingFreeEntrySize);
@@ -223,7 +226,8 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 			leadingFreeEntry = NULL;
 		} else {
 			/* The trailing space of the previous chunk has no connecting partner - check if the trailing space merits an entry in the free list */
-			if (previousConnectChunk->isTrailingFreeCandidateEligibleForRecycling()) {
+			if (isEligibleForFreeMemory(env, memoryPool, previousConnectChunk->trailingFreeCandidate, previousConnectChunk->trailingFreeCandidateSize)) {
+
 #if defined(J9MODRON_SWEEP_SCHEME_CONNECT_CHUNKS_TRACE)
 				omrtty_printf("CC: trailing from previous used %p(+%p)\n", previousConnectChunk->trailingFreeCandidate, previousConnectChunk->trailingFreeCandidateSize);
 #endif
@@ -268,7 +272,7 @@ MM_SweepPoolManagerAddressOrderedListBase::connectChunk(MM_EnvironmentBase *env,
 		 * Check if it merits an entry in the free list
 		 */
 		if(NULL != leadingFreeEntry) {
-			if (chunk->isFreeSizeEligibleForRecycling(leadingFreeEntrySize)) {
+			if (isEligibleForFreeMemory(env, memoryPool, leadingFreeEntry, leadingFreeEntrySize)) {
 
 				Assert_MM_true(previousFreeEntry <= leadingFreeEntry);
 
@@ -371,7 +375,7 @@ MM_SweepPoolManagerAddressOrderedListBase::flushFinalChunk(
 		MM_MemoryPoolAddressOrderedListBase *memoryPool = (MM_MemoryPoolAddressOrderedListBase *)memoryPoolBase;
 
 		/* Check if the entry is a candidate */
-		if (!sweepState->_connectPreviousChunk->isTrailingFreeCandidateEligibleForRecycling()) {
+		if (!isEligibleForFreeMemory(envModron, memoryPool, sweepState->_connectPreviousChunk->trailingFreeCandidate, sweepState->_connectPreviousChunk->trailingFreeCandidateSize)) {
 			/* It is not - abandon it */
 			memoryPool->abandonMemoryInPool(envModron,
 					sweepState->_connectPreviousChunk->trailingFreeCandidate,
@@ -483,7 +487,7 @@ MM_SweepPoolManagerAddressOrderedListBase::addFreeMemory(MM_EnvironmentBase *env
 		address = (uintptr_t *) (((uintptr_t)address) + objectSizeDelta);
 		MM_MemoryPoolAddressOrderedListBase *memoryPool = (MM_MemoryPoolAddressOrderedListBase *)sweepChunk->memoryPool;
 
-		if ((sweepChunk->isFreeSizeEligibleForRecycling(heapFreeByteCount)) &&
+		if (isEligibleForFreeMemory(env, memoryPool, address, heapFreeByteCount) &&
 			memoryPool->connectInnerMemoryToPool(env, address, heapFreeByteCount, sweepChunk->freeListTail)) {
 
 #if defined(J9MODRON_ALLOCATION_MANAGER_TRACE)

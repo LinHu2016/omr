@@ -52,7 +52,6 @@ private:
 protected:
 
 	MM_GCExtensionsBase *_extensions;
-	uintptr_t _minFreeSize;
 
 	virtual void tearDown(MM_EnvironmentBase *env);
 	virtual bool initialize(MM_EnvironmentBase *env);
@@ -107,14 +106,11 @@ public:
 	 */
 	virtual MM_SweepPoolState *getPoolState(MM_MemoryPool *memoryPool) = 0;
 
-	MMINLINE uintptr_t getMinimumFreeSize() { return _minFreeSize; }
-
 	/**
 	 * Create a SweepPoolManager object.
 	 */
 	MM_SweepPoolManager(MM_EnvironmentBase *env)
 		: _extensions(env->getExtensions())
-		, _minFreeSize(_extensions->getMinimumFreeEntrySize())
 	{
 		_typeId = __FUNCTION__;
 	}
