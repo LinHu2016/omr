@@ -50,6 +50,9 @@ private:
 	void *_allocatePointer;	/**< The base address of the unused portion of the receiver and the next pointer which could be returned by an allocation request */
 	void *_topPointer;	/**< The top of the memory area managed by the receiver */
 		
+	uintptr_t _scannableBytes;	/**< estimate of scannable bytes in the pool (only out of sampled objects) */
+	uintptr_t _nonScannableBytes; /**< estimate of non-scannable bytes in the pool (only out of sampled objects) */
+
 	MM_SweepPoolState *_sweepPoolState;	/**< GC Sweep Pool State */
 	MM_SweepPoolManager *_sweepPoolManager;		/**< pointer to SweepPoolManager class */
 
@@ -134,6 +137,13 @@ public:
 	 */
 	void recalculateMemoryPoolStatistics(MM_EnvironmentBase *env);
 
+	/**
+	 * Increase the scannable/non-scannable estimate for the receiver by the specified amount
+	 * @param scannableBytes the number of bytes to increase for scannable objects
+	 * @param non-scannableBytes the number of bytes to increase for scannable objects
+	 */
+	MMINLINE void incrementScannableBytes(uintptr_t scannableBytes, uintptr_t nonScannableBytes) { _scannableBytes += scannableBytes; _nonScannableBytes += nonScannableBytes; }
+
 	MMINLINE uintptr_t getFreeMemoryAndDarkMatterBytes() {
 		uintptr_t actualFreeMemory = getActualFreeMemorySize();
 		uintptr_t darkMatter = getDarkMatterBytes();
@@ -144,6 +154,16 @@ public:
 		Assert_MM_true((0 == actualFreeMemory) || (actualFreeMemory >= allocatableMemory));
 		return OMR_MAX(actualFreeMemory + darkMatter, allocatableMemory);
 	}
+
+	/**
+	 * @return the recorded estimate of scannable in the receiver
+	 */
+	MMINLINE uintptr_t getScannableBytes() { return _scannableBytes; }
+	/**
+	 * @return the recorded estimate of non-scannable in the receiver
+	 */	
+	MMINLINE uintptr_t getNonScannableBytes() { return _nonScannableBytes; }
+
 
 	/**
 	 * Used when a caller wishes to determine the end of the allocated space in the receiver.  Note that the space between this
@@ -208,6 +228,8 @@ public:
 		MM_MemoryPool(env, minimumFreeEntrySize)
 		,_allocatePointer(NULL)
 		,_topPointer(NULL)
+		,_scannableBytes(0)
+		,_nonScannableBytes(0)
 		,_sweepPoolState(NULL)
 		,_sweepPoolManager(NULL)
 		,_heapFreeList(NULL)
