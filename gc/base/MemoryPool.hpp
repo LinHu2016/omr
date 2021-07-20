@@ -337,7 +337,26 @@ public:
 	 * Increase the dark matter estimate for the receiver by the specified amount
 	 * @param bytes the number of bytes to increase the recorded estimate
 	 */
-	MMINLINE void incrementDarkMatterBytes(uintptr_t bytes) { _darkMatterBytes += bytes; }
+	MMINLINE void incrementDarkMatterBytes(uintptr_t bytes, bool needSync = false)
+	{
+		if (!needSync) {
+			_darkMatterBytes += bytes;
+		} else {
+			MM_AtomicOperations::add(&_darkMatterBytes, bytes);
+		}
+	}
+
+	MMINLINE void decrementDarkMatterBytes(uintptr_t bytes, bool needSync = false)
+	{
+		if (!needSync) {
+			_darkMatterBytes -= bytes;
+		} else {
+			MM_AtomicOperations::subtract(&_darkMatterBytes, bytes);
+		}
+	}
+
+
+
 	/**
 	 * @return the recorded estimate of dark matter in the receiver
 	 */
