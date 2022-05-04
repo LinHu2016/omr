@@ -867,6 +867,7 @@ public:
 #endif /* defined(OMR_VALGRIND_MEMCHECK) */
 
 	bool shouldForceLowMemoryHeapCeilingShiftIfPossible; /**< Whether we should force compressed reference shift to 3 **/
+	bool rebuildMarkMapForCompact;
 	/* Function Members */
 private:
 
@@ -1879,6 +1880,7 @@ public:
 		, memcheckHashTable(NULL)
 		, shouldForceLowMemoryHeapCeilingShiftIfPossible(false)
 #endif /* defined(OMR_VALGRIND_MEMCHECK) */
+		, rebuildMarkMapForCompact(false)
 	{
 		_typeId = __FUNCTION__;
 	}

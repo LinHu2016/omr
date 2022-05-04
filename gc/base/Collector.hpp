@@ -39,6 +39,7 @@ class MM_ConcurrentPhaseStatsBase;
 class MM_MemoryPool;
 class MM_ObjectAllocationInterface;
 class MM_MemorySubSpace;
+class MM_MarkMap;
 
 /**
  * @todo Provide class documentation
@@ -281,6 +282,7 @@ public:
 	 * @return true if the collector implementation knows that the given objectPtr is marked (false if not or if the implementation doesn't know)
 	 */
 	virtual bool isMarked(void* objectPtr);
+	virtual MM_MarkMap *getMarkMap() { return NULL; }
 	
 	virtual void preMainGCThreadInitialize(MM_EnvironmentBase *env) {}
 	virtual	void mainThreadGarbageCollect(MM_EnvironmentBase *env, MM_AllocateDescription *allocDescription, bool initMarkMap = false, bool rebuildMarkBits = false) {}

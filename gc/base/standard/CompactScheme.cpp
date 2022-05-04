@@ -25,7 +25,7 @@
 #if defined(OMR_GC_MODRON_COMPACTION)
 
 #include "CompactScheme.hpp"
-
+#include "omrport.h"
 #include "ModronAssertions.h"
 
 #include "AllocateDescription.hpp"
@@ -626,8 +626,10 @@ MM_CompactScheme::compact(MM_EnvironmentBase *envBase, bool rebuildMarkBits, boo
 		env->_currentTask->releaseSynchronizedGCThreads(env);
 	}
 
-	if (rebuildMarkBits) {
+	if (rebuildMarkBits || _extensions->rebuildMarkMapForCompact) {
 		rebuildMarkbits(env);
+		OMRPORT_ACCESS_FROM_ENVIRONMENT(env);
+		omrtty_printf("compact rebuildMarkbits\n");
 		MM_AtomicOperations::sync();
 	}
 

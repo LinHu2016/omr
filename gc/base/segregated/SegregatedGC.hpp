@@ -98,6 +98,8 @@ public:
 	virtual bool heapRemoveRange(MM_EnvironmentBase *env, MM_MemorySubSpace *subspace,uintptr_t size, void *lowAddress, void *highAddress, void *lowValidAddress, void *highValidAddress);
 
 	virtual bool isMarked(void *objectPtr) { return _markingScheme->isMarked(static_cast<omrobjectptr_t>(objectPtr)); }
+	virtual MM_MarkMap *getMarkMap() { return getMarkingScheme()->getMarkMap(); }
+
 
 	/**
 	 * Return reference to Marking Scheme

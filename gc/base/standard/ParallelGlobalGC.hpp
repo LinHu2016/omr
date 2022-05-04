@@ -308,6 +308,8 @@ public:
 
 	virtual bool isMarked(void *objectPtr);
 
+	virtual MM_MarkMap *getMarkMap() { return getMarkingScheme()->getMarkMap(); }
+
 	virtual void checkColorAndMark(MM_EnvironmentBase* env, omrobjectptr_t objectPtr);
 
 	/**

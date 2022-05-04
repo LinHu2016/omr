@@ -503,6 +503,10 @@ MM_ParallelGlobalGC::mainThreadGarbageCollect(MM_EnvironmentBase *env, MM_Alloca
 
 	/* If the delegate has isAllowUserHeapWalk set, fix the heap so that it can be walked */
 	if (_delegate.isAllowUserHeapWalk() || env->_cycleState->_gcCode.isRASDumpGC()) {
+
+		OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+		omrtty_printf("MM_ParallelGlobalGC::mainThreadGarbageCollect _delegate.isAllowUserHeapWalk() == true \n");
+
 		if (!_fixHeapForWalkCompleted) {
 #if defined(OMR_GC_MODRON_COMPACTION)
 			if (compactedThisCycle) {
