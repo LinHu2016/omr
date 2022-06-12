@@ -121,6 +121,14 @@ typedef enum MM_MarkingSchemeScanReason {
 	SCAN_REASON_OVERFLOWED_OBJECT = 4, /**< Indicates the object being scanned was in an overflowed region */
 } MM_MarkingSchemeScanReason;
 
+typedef enum MM_ScavengeScanReason {
+	SCAN_REASON_SCAVENGE = 10,
+	SCAN_REASON_INCREMENTALSCAVENGE = 11,
+	SCAN_REASON_FIXUP  = 12,
+	SCAN_REASON_BACKOUT = 13,
+	SCAN_REASON_SHOULDREMEMBER = 14,
+} MM_ScavengeScanReason;
+
 #define OMR_GC_CYCLE_TYPE_DEFAULT     0
 #define OMR_GC_CYCLE_TYPE_GLOBAL      1
 #define OMR_GC_CYCLE_TYPE_SCAVENGE    2

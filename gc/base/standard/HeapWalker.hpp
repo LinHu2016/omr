@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2015 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -28,19 +28,21 @@
 #include "objectdescription.h"
 
 #include "BaseVirtual.hpp"
+#include "HeapWalkerDelegate.hpp"
 
 class MM_EnvironmentBase;
 class MM_Heap;
 class MM_HeapRegionDescriptor;
 class MM_MemorySubSpace;
 
-typedef void (*MM_HeapWalkerObjectFunc)(OMR_VMThread *, MM_HeapRegionDescriptor *, omrobjectptr_t, void *);
+typedef void (*MM_HeapWalkerObjectFunc)(OMR_VMThread *, MM_HeapRegionDescriptor *, omrobjectptr_t, void *, MM_HeapWalkerDelegate *);
 typedef void (*MM_HeapWalkerSlotFunc)(OMR_VM *, omrobjectptr_t *, void *, uint32_t);
 
 class MM_HeapWalker : public MM_BaseVirtual
 {
+private:
 protected:
-
+MM_HeapWalkerDelegate _delegate;
 #if defined(OMR_GC_MODRON_SCAVENGER)
 	void rememberedObjectSlotsDo(MM_EnvironmentBase *env, MM_HeapWalkerSlotFunc function, void *userData, uintptr_t walkFlags, bool parallel);
 #endif /* OMR_GC_MODRON_SCAVENGER */
@@ -53,6 +55,7 @@ public:
 	static MM_HeapWalker *newInstance(MM_EnvironmentBase *env); 	
 	virtual void kill(MM_EnvironmentBase *env);
 	
+	void heapWalkerSlotCallback(MM_EnvironmentBase *env, omrobjectptr_t *objectSlotPtr, MM_HeapWalkerSlotFunc function, void * userData);
 	/**
 	 * constructor of Heap Walker
 	 */

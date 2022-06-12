@@ -96,7 +96,7 @@ poisonReferenceSlot(MM_EnvironmentBase *env, GC_SlotObject *slotObject)
 }
 
 void
-poisonReferenceSlots(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData)
+poisonReferenceSlots(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData, MM_HeapWalkerDelegate *delegate)
 {
 	GC_ObjectIterator objectIterator(omrVMThread->_vm, object);
 	GC_SlotObject *slotObject = NULL;
@@ -125,7 +125,7 @@ healReferenceSlot(MM_EnvironmentBase *env, GC_SlotObject *slotObject)
 }
 
 void
-healReferenceSlots(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData)
+healReferenceSlots(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData, MM_HeapWalkerDelegate *delegate)
 {
 		GC_ObjectIterator objectIterator(omrVMThread->_vm, object);
 		GC_SlotObject *slotObject = NULL;
@@ -157,7 +157,7 @@ static void globalGCHookSysEnd(J9HookInterface** hook, uintptr_t eventNum, void*
  * violate that meaning (see CMVC 122959 for an example of such a mistake).
  */
 static void
-fixObject(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData)
+fixObject(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData, MM_HeapWalkerDelegate *delegate)
 {
 	MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(omrVMThread->_vm);
 	MM_ParallelGlobalGC *collector = (MM_ParallelGlobalGC *)extensions->getGlobalCollector();

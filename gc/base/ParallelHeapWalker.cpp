@@ -128,7 +128,7 @@ MM_ParallelHeapWalker::allObjectsDoParallel(MM_EnvironmentBase *env, MM_HeapWalk
 			GC_ParallelObjectHeapIterator objectHeapIterator(env, region, region->getLowAddress(), region->getHighAddress(), _markMap, parallelChunkSize);
 			omrobjectptr_t object = NULL;
 			while ((object = objectHeapIterator.nextObject()) != NULL) {
-				function(omrVMThread, region, object, userData);
+				function(omrVMThread, region, object, userData, &_delegate);
 				objectsWalked += 1;
 			}
 		}

@@ -174,7 +174,6 @@ private:
 	void restoreMainThreadTenureTLHRemainders(MM_EnvironmentStandard *env);
 	
 	void setBackOutFlag(MM_EnvironmentBase *env, BackOutState value);
-	MMINLINE bool isBackOutFlagRaised() { return _extensions->isScavengerBackOutFlagRaised(); }
 	
 	/**
 	 * Check if concurrent phase of the cycle should yield to an external activity. If so, set the flag so that other GC threads react appropriately
@@ -221,6 +220,7 @@ private:
 	uintptr_t calculateMaxCacheCount(uintptr_t activeMemorySize);
 
 public:
+	MMINLINE bool isBackOutFlagRaised() { return _extensions->isScavengerBackOutFlagRaised(); }
 	/**
 	 * Hook callback. Called when a global collect has started
 	 */
@@ -249,9 +249,11 @@ public:
 	 * @param objectptr the object to scan
 	 * @param objectScannerState points to space for inline allocation of scanner
 	 * @param flags scanner flags
+	 * @param[in] reason See MM_ScavengeScanReason
+	 * @param[out]shouldRemember
 	 * @return the object scanner
 	 */
-	MMINLINE GC_ObjectScanner *getObjectScanner(MM_EnvironmentStandard *env, omrobjectptr_t objectptr, void *objectScannerState, uintptr_t flags);
+	MMINLINE GC_ObjectScanner *getObjectScanner(MM_EnvironmentStandard *env, omrobjectptr_t objectptr, void *objectScannerState, uintptr_t flags, MM_ScavengeScanReason reason, bool *shouldRemember);
 
 	uintptr_t calculateCopyScanCacheSizeForWaitingThreads(uintptr_t maxCacheSize, uintptr_t threadCount, uintptr_t waitingThreads);
 	uintptr_t calculateCopyScanCacheSizeForQueueLength(uintptr_t maxCacheSize, uintptr_t threadCount, uintptr_t scanCacheCount);

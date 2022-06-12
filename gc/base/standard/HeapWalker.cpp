@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 1991, 2015 IBM Corp. and others
+ * Copyright (c) 1991, 2022 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -27,6 +27,7 @@
 
 #include "CollectorLanguageInterface.hpp"
 #include "GCExtensionsBase.hpp"
+#include "EnvironmentBase.hpp"
 #include "Heap.hpp"
 #include "HeapRegionIterator.hpp"
 #include "HeapRegionManager.hpp"
@@ -70,7 +71,7 @@ heapWalkerObjectFieldSlotDo(OMR_VM *omrVM, omrobjectptr_t object, GC_SlotObject 
  * walk through slots of mixed object and apply the user function.
  */
 static void
-heapWalkerObjectSlotDo(OMR_VM *omrVM, omrobjectptr_t object, MM_HeapWalkerSlotFunc oSlotIterator, void *localUserData)
+heapWalkerObjectSlotDo(OMR_VM *omrVM, OMR_VMThread *omrVMThread, omrobjectptr_t object, MM_HeapWalkerSlotFunc oSlotIterator, void *localUserData, MM_HeapWalkerDelegate *delegate)
 {
 	GC_ObjectIterator objectIterator(omrVM, object);
 	GC_SlotObject *slotObject;
@@ -78,13 +79,22 @@ heapWalkerObjectSlotDo(OMR_VM *omrVM, omrobjectptr_t object, MM_HeapWalkerSlotFu
 	while ((slotObject = objectIterator.nextSlot()) != NULL) {
 		heapWalkerObjectFieldSlotDo(omrVM, object, slotObject, oSlotIterator, localUserData);
 	}
+
+	delegate->doObject(MM_EnvironmentBase::getEnvironment(omrVMThread), object, oSlotIterator, localUserData);
+}
+
+void
+MM_HeapWalker::heapWalkerSlotCallback(MM_EnvironmentBase *env, omrobjectptr_t *objectSlotPtr, MM_HeapWalkerSlotFunc function, void * userData)
+{
+	OMR_VM *omrVM = env->getOmrVMThread()->_vm;
+	(*function)(omrVM, objectSlotPtr, userData,0);
 }
 
 /**
  * walk through slots of an object and apply the user function.
  */
 static void
-heapWalkerObjectSlotDo(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData)
+heapWalkerObjectSlotDo(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *region, omrobjectptr_t object, void *userData, MM_HeapWalkerDelegate *delegate)
 {
 	OMR_VM *omrVM = omrVMThread->_vm;
 	MM_GCExtensionsBase *extensions = MM_GCExtensionsBase::getExtensions(omrVM);
@@ -97,7 +107,7 @@ heapWalkerObjectSlotDo(OMR_VMThread *omrVMThread, MM_HeapRegionDescriptor *regio
 		(*oSlotIterator)(omrVM, &indirectObject, localUserData, 0);
 	}
 
-	heapWalkerObjectSlotDo(omrVM, object, oSlotIterator, localUserData);
+	heapWalkerObjectSlotDo(omrVM, omrVMThread, object, oSlotIterator, localUserData, delegate);
 }
 
 MM_HeapWalker *
@@ -116,6 +126,9 @@ MM_HeapWalker::newInstance(MM_EnvironmentBase *env)
 bool
 MM_HeapWalker::initialize(MM_EnvironmentBase *env)
 {
+	if (!_delegate.initialize(env, this)) {
+		return false;
+	}
 	return true;
 }
 
@@ -146,7 +159,7 @@ MM_HeapWalker::rememberedObjectSlotsDo(MM_EnvironmentBase *env, MM_HeapWalkerSlo
 			GC_SublistSlotIterator remSetSlotIterator(puddle);
 			while ((slotPtr = (omrobjectptr_t*)remSetSlotIterator.nextSlot()) != NULL) {
 				if (*slotPtr != NULL) {
-					heapWalkerObjectSlotDo(omrVMThread, NULL, *slotPtr, &slotObjectDoUserData);
+					heapWalkerObjectSlotDo(omrVMThread, NULL, *slotPtr, &slotObjectDoUserData, &_delegate);
 				}
 			}
 		}
@@ -212,7 +225,7 @@ MM_HeapWalker::allObjectsDo(MM_EnvironmentBase *env, MM_HeapWalkerObjectFunc fun
 			GC_ObjectHeapIteratorAddressOrderedList liveObjectIterator(extensions, region, false);
 
 			while (NULL != (object = liveObjectIterator.nextObject())) {
-				function(omrVMThread, region, object, userData);
+				function(omrVMThread, region, object, userData, &_delegate);
 			}
 		}
 	}
