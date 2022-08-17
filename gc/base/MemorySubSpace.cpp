@@ -2013,3 +2013,9 @@ MM_MemorySubSpace::releaseFreeMemoryPages(MM_EnvironmentBase* env)
         return 0;
 }
 #endif
+
+void *
+MM_MemorySubSpace::getLowAddressAllocate()
+{
+	return getFirstRegion()->getLowAddress();
+}

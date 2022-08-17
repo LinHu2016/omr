@@ -450,6 +450,7 @@ public:
 	virtual uintptr_t releaseFreeMemoryPages(MM_EnvironmentBase* env);
 #endif
 
+	virtual void *getLowAddressAllocate();
 	/**
 	 * Create a MemorySubSpace object.
 	 */

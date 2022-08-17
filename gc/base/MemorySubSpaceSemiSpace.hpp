@@ -170,6 +170,7 @@ public:
 	 */
 	virtual void mergeLargeObjectAllocateStats(MM_EnvironmentBase *env);
 
+	virtual void *getLowAddressAllocate() { return _memorySubSpaceAllocate->getLowAddressAllocate(); }
 	/**
 	 * Create a MemorySubSpaceSemiSpace object.
 	 */

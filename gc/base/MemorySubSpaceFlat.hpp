@@ -88,6 +88,8 @@ public:
 	virtual uintptr_t releaseFreeMemoryPages(MM_EnvironmentBase* env);
 #endif
 
+	virtual void *getLowAddressAllocate() { return _memorySubSpace->getLowAddressAllocate(); }
+
 	/**
 	 * Create a new MM_MemorySubSpaceFlat object
 	 */
