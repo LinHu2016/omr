@@ -102,7 +102,7 @@ public:
 	 *
 	 * @return data pointer at sparse heap that satisfies the requested size
 	 */
-	void *allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size);
+	void *allocateSparseFreeEntryAndMapToHeapObject(MM_EnvironmentBase* env, void *proxyObjPtr, uintptr_t size);
 
 	/**
 	 * Once object is collected by GC, we need to free the sparse region associated

@@ -1465,11 +1465,7 @@ public:
 	 * @param address   pointer to arraylet data that we will check to see if it resides in the heap
 	 * @return true if the address given is within the heap
 	 */
-	MMINLINE bool
-	isAddressWithinHeap(void *address)
-	{
-		return ((uintptr_t)address >= (uintptr_t) heap->getHeapBase()) && ((uintptr_t)address < (uintptr_t)heap->getHeapTop());
-	}
+	bool isAddressWithinHeap(void *address);
 
 	MM_GCExtensionsBase()
 		: MM_BaseVirtual()

@@ -109,7 +109,7 @@ public:
 	 * @return address of free region or NULL if there's no such contiguous free region
 	 */
 
-	void *findFreeListEntry(uintptr_t size);
+	void *findFreeListEntry(MM_EnvironmentBase *env, uintptr_t size);
 
 	/**
 	 * A region was freed, now we insert that back into the freeList ordered by address
@@ -117,7 +117,7 @@ public:
 	 * @param address	void*		Address associated to region to be returned
 	 * @param size		uintptr_t	Size of region to be returned to freeList
 	 */
-	bool returnFreeListEntry(void *address, uintptr_t size);
+	bool returnFreeListEntry(MM_EnvironmentBase *env, void *address, uintptr_t size);
 
 	/**
 	 * Add object entry to the hash table that maps the proxyObjPtr to the data pointer

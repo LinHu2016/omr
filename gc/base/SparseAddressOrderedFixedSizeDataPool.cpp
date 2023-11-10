@@ -226,13 +226,17 @@ MM_SparseAddressOrderedFixedSizeDataPool::createNewSparseHeapFreeListNode(void *
 }
 
 void *
-MM_SparseAddressOrderedFixedSizeDataPool::findFreeListEntry(uintptr_t size)
+MM_SparseAddressOrderedFixedSizeDataPool::findFreeListEntry(MM_EnvironmentBase *env, uintptr_t size)
 {
+//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+
 	Assert_MM_true(_freeListPoolFreeNodesCount > 0);
 	MM_SparseHeapLinkedFreeHeader *previous = NULL;
 	MM_SparseHeapLinkedFreeHeader *current = _heapFreeList;
 	void *returnAddr = NULL;
 	uintptr_t currSize = 0;
+
+//	omrtty_printf("findFreeListEntry start env=%p, _freeListPoolFreeNodesCount=%zu, size=%zu\n", env, _freeListPoolFreeNodesCount, size);
 
 	/* Find big enough free space */
 	while (NULL != current) {
@@ -243,6 +247,7 @@ MM_SparseAddressOrderedFixedSizeDataPool::findFreeListEntry(uintptr_t size)
 		current = current->_next;
 	}
 
+//	omrtty_printf("findFreeListEntry env=%p, _freeListPoolFreeNodesCount=%zu, size=%zu current=%p, current->_size=%zu\n", env, _freeListPoolFreeNodesCount, size, current, (NULL == current)?0:current->_size);
 	/* Should be impossible for current to be NULL since sparse heap will always have available space, however this case should still be checked */
 	if (NULL != current) {
 		currSize = current->_size;
@@ -278,11 +283,14 @@ MM_SparseAddressOrderedFixedSizeDataPool::findFreeListEntry(uintptr_t size)
 }
 
 bool
-MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(void *dataAddr, uintptr_t size)
+MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(MM_EnvironmentBase *env, void *dataAddr, uintptr_t size)
 {
 	MM_SparseHeapLinkedFreeHeader *previous = NULL;
 	MM_SparseHeapLinkedFreeHeader *current = _heapFreeList;
 	void *endAddress = (void *)((uintptr_t)dataAddr + size);
+
+//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+//	omrtty_printf("returnFreeListEntry start env=%p, dataAddr=%p, _freeListPoolFreeNodesCount=%zu, size=%zu, _heapFreeList=%p, endAddress=%p\n", env, dataAddr, _freeListPoolFreeNodesCount, size, _heapFreeList, endAddress);
 
 	/* First find where we should include the new node if needed */
 	while (NULL != current) {
@@ -316,6 +324,8 @@ MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(void *dataAddr, ui
 	 * Case 8 -> <here> -> current
 	 */
 
+//	omrtty_printf("returnFreeListEntry env=%p, dataAddr=%p, size=%zu, current->_address=%p, previous=%p, _freeListPoolFreeNodesCount=%zu, _approximateFreeMemorySize=%zu, _freeListPoolAllocBytes=%zu\n",
+//			env, dataAddr, size, current->_address, previous, _freeListPoolFreeNodesCount, _approximateFreeMemorySize, _freeListPoolAllocBytes);
 	/* Case 7 and 8: previous is NULL */
 	if (NULL == previous) {
 		void *currentAddr = current->_address;
@@ -327,7 +337,8 @@ MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(void *dataAddr, ui
 			newNode->_next = current;
 			_heapFreeList = newNode;
 		}
-        } else {
+//		omrtty_printf("returnFreeListEntry case7/8 env=%p, dataAddr=%p, size=%zu, _freeListPoolFreeNodesCount=%zu, currentAddr=%p\n", env, dataAddr, size, _freeListPoolFreeNodesCount, currentAddr);
+   } else {
 		/* Should we merge with previous */
 		void *previousHighAddr = (void *)((uintptr_t)previous->_address + previous->_size);
 		/* Case 2 and 5 */
@@ -340,10 +351,12 @@ MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(void *dataAddr, ui
 				pool_removeElement(_freeListPool, current);
 				_freeListPoolFreeNodesCount--;
 			}
+//			omrtty_printf("returnFreeListEntry case2/5 env=%p, dataAddr=%p, size=%zu, _freeListPoolFreeNodesCount=%zu, previousHighAddr=%p\n", env, dataAddr, size, _freeListPoolFreeNodesCount, previousHighAddr);
 		/* Case 3: Merge node to current only */
 		} else if ((NULL != current) && (current->_address == endAddress)) {
 			current->expandSize(size);
 			current->setAddress(dataAddr);
+//			omrtty_printf("returnFreeListEntry case3 env=%p, dataAddr=%p, size=%zu, _freeListPoolFreeNodesCount=%zu, current->_address=%p\n", env, dataAddr, size, _freeListPoolFreeNodesCount, current->_address);
 		/* Cases 1 and 6: Insert new node between nodes or at the end of the list */
 		} else {
 			Assert_MM_true(previousHighAddr < dataAddr);
@@ -351,6 +364,7 @@ MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(void *dataAddr, ui
 			MM_SparseHeapLinkedFreeHeader *newNode = createNewSparseHeapFreeListNode(dataAddr, size);
 			previous->_next = newNode;
 			newNode->_next = current;
+//			omrtty_printf("returnFreeListEntry case1/6 env=%p, dataAddr=%p, size=%zu, _freeListPoolFreeNodesCount=%zu, previousHighAddr=%p\n", env, dataAddr, size, _freeListPoolFreeNodesCount, previousHighAddr);
 		}
 	}
 
@@ -358,6 +372,7 @@ MM_SparseAddressOrderedFixedSizeDataPool::returnFreeListEntry(void *dataAddr, ui
 	_freeListPoolAllocBytes -= size;
 	_lastFreeBytes = size;
 
+//	omrtty_printf("returnFreeListEntry end env=%p, dataAddr=%zu, size=%zu, _freeListPoolFreeNodesCount=%zu, _approximateFreeMemorySize=%zu, _freeListPoolAllocBytes=%zu\n", env, dataAddr, size, _freeListPoolFreeNodesCount, _approximateFreeMemorySize, _freeListPoolAllocBytes);
 	Trc_MM_SparseAddressOrderedFixedSizeDataPool_returnFreeListEntry_success(dataAddr, (void *)size, _freeListPoolFreeNodesCount, (void *)_approximateFreeMemorySize, (void *)_freeListPoolAllocBytes);
 	return true;
 }

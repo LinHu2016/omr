@@ -93,6 +93,9 @@ MM_SparseVirtualMemory::initialize(MM_EnvironmentBase* env, uint32_t memoryCateg
 void
 MM_SparseVirtualMemory::tearDown(MM_EnvironmentBase *env)
 {
+//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+//	omrtty_printf("MM_SparseVirtualMemory::tearDown\n env=%p\n", env);
+
 	if (NULL != _sparseDataPool) {
 		_sparseDataPool->kill(env);
 		_sparseDataPool = NULL;
@@ -123,28 +126,37 @@ MM_SparseVirtualMemory::updateSparseDataEntryAfterObjectHasMoved(void *dataPtr, 
 }
 
 void *
-MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size)
+MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(MM_EnvironmentBase* env, void *proxyObjPtr, uintptr_t size)
 {
 	/* Commiting and decommiting memory sizes must be multiple of pagesize */
 	uintptr_t adjustedSize = MM_Math::roundToCeiling(_pageSize, size);
 
+//	OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+//	omrtty_printf("allocateSparseFreeEntryAndMapToHeapObject start env=%p, proxyObjPtr=%p, size=%zu, adjustedSize=%zu, _sparseDataPool=%p, _largeObjectVirtualMemoryMutex=%p\n", env, proxyObjPtr, size, adjustedSize, _sparseDataPool, _largeObjectVirtualMemoryMutex);
+
 	omrthread_monitor_enter(_largeObjectVirtualMemoryMutex);
-	void *sparseHeapAddr = _sparseDataPool->findFreeListEntry(adjustedSize);
+	void *sparseHeapAddr = _sparseDataPool->findFreeListEntry(env, adjustedSize);
+//	omrtty_printf("findFreeListEntry env=%p, proxyObjPtr=%p, sparseHeapAddr=%p, adjustedSize=%zu\n", env, proxyObjPtr, sparseHeapAddr, adjustedSize);
 	bool success = MM_VirtualMemory::commitMemory(sparseHeapAddr, adjustedSize);
+//	omrtty_printf("commitMemory env=%p, proxyObjPtr=%p, sparseHeapAddr=%p, adjustedSize=%zu, result=%zu\n", env, proxyObjPtr, sparseHeapAddr, adjustedSize, success);
 
 	/* We can likely significantly reduce the list of platforms requiring zeroing after commit - however initially we will take an ultra safe approach */
 #if !(defined(LINUX) && defined(J9VM_ARCH_X86))
 	OMRZeroMemory(sparseHeapAddr, adjustedSize);
+//	omrtty_printf("OMRZeroMemory env=%p, proxyObjPtr=%p, sparseHeapAddr=%p, adjustedSize=%zu\n", env, proxyObjPtr, sparseHeapAddr, adjustedSize);
 #endif /* !(defined(LINUX) && defined(J9VM_ARCH_X86)) */
 
 	if (NULL != sparseHeapAddr) {
 		_sparseDataPool->mapSparseDataPtrToHeapProxyObjectPtr(sparseHeapAddr, proxyObjPtr, adjustedSize);
+//		omrtty_printf("mapSparseDataPtrToHeapProxyObjectPtr env=%p, proxyObjPtr=%p, sparseHeapAddr=%p, adjustedSize=%zu\n", env, proxyObjPtr, sparseHeapAddr, adjustedSize);
 	} else {
 		/* Impossible to get here, there should always be free space at sparse heap */
 		Assert_MM_unreachable();
 	}
 
 	omrthread_monitor_exit(_largeObjectVirtualMemoryMutex);
+
+//	omrtty_printf("allocateSparseFreeEntryAndMapToHeapObject env=%p sparseHeapAddr=%p, proxyObjPtr=%p, size=%zu, adjustedSize=%zu\n", env, sparseHeapAddr, proxyObjPtr, size, adjustedSize);
 
 	if (success) {
 		Trc_MM_SparseVirtualMemory_commitMemory_success(sparseHeapAddr, (void*)adjustedSize, proxyObjPtr);
@@ -165,9 +177,13 @@ MM_SparseVirtualMemory::freeSparseRegionAndUnmapFromHeapObject(MM_EnvironmentBas
 	if ((NULL != dataPtr) && (0 != dataSize)) {
 		Assert_MM_true(0 == (dataSize % _pageSize));
 		ret = decommitMemory(env, dataPtr, dataSize);
+
+//		OMRPORT_ACCESS_FROM_OMRPORT(env->getPortLibrary());
+//		omrtty_printf("freeSparseRegionAndUnmapFromHeapObject env=%p dataPtr=%p, dataSize=%zu ret=%zu\n", env, dataPtr, dataSize, ret);
+
 		if (ret) {
 			omrthread_monitor_enter(_largeObjectVirtualMemoryMutex);
-			ret = (_sparseDataPool->returnFreeListEntry(dataPtr, dataSize) && _sparseDataPool->unmapSparseDataPtrFromHeapProxyObjectPtr(dataPtr));
+			ret = (_sparseDataPool->returnFreeListEntry(env, dataPtr, dataSize) && _sparseDataPool->unmapSparseDataPtrFromHeapProxyObjectPtr(dataPtr));
 			omrthread_monitor_exit(_largeObjectVirtualMemoryMutex);
 			Trc_MM_SparseVirtualMemory_decommitMemory_success(dataPtr, (void*)dataSize);
 		} else {
