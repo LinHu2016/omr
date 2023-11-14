@@ -84,6 +84,10 @@ MM_GCExtensionsBase::initialize(MM_EnvironmentBase* env)
 		heapCeiling = LOW_MEMORY_HEAP_CEILING; /* By default, compressed pointers builds run in the low 64GiB */
 	}
 
+#if defined(OMR_GC_VLHGC)
+	configurationOptions._gcPolicy = gc_policy_balanced;
+#else
+
 #if defined(OMR_GC_MODRON_STANDARD)
 #if defined(OMR_GC_MODRON_SCAVENGER)
 	configurationOptions._gcPolicy = gc_policy_gencon;
@@ -98,6 +102,7 @@ MM_GCExtensionsBase::initialize(MM_EnvironmentBase* env)
 #error Default GC policy cannot be determined
 #endif /* OMR_GC_MODRON_STANDARD */
 
+#endif /* OMR_GC_VLHGC */
 
 #if defined(OMR_GC_MODRON_SCAVENGER)
 	if (!rememberedSet.initialize(env, OMR::GC::AllocationCategory::REMEMBERED_SET)) {
