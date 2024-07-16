@@ -1457,6 +1457,14 @@ public:
 	MMINLINE virtual bool reinitializationInProgress() { return false; }
 #endif /* defined(J9VM_OPT_CRIU_SUPPORT) */
 
+	/**
+	 * Check if the address is within the heap.
+	 *
+	 * @param address   pointer to arraylet data that we will check to see if it resides in the heap
+	 * @return true if the address given is within the heap
+	 */
+	bool isAddressWithinHeap(void *address);
+
 	MM_GCExtensionsBase()
 		: MM_BaseVirtual()
 #if defined(OMR_GC_MODRON_SCAVENGER)
@@ -1509,12 +1517,12 @@ public:
 		, largePageWarnOnError(false)
 		, largePageFailOnError(false)
 		, largePageFailedToSatisfy(false)
-#if defined(OMR_GC_DOUBLE_MAP_ARRAYLETS)
 		, isArrayletDoubleMapRequested(false)
 		, isArrayletDoubleMapAvailable(false)
-#endif /* defined(OMR_GC_DOUBLE_MAP_ARRAYLETS) */
+#if defined(OMR_GC_SPARSE_HEAP_ALLOCATION)
 		, isVirtualLargeObjectHeapRequested(false)
 		, isVirtualLargeObjectHeapEnabled(false)
+#endif /* defined(OMR_GC_SPARSE_HEAP_ALLOCATION) */
 		, requestedPageSize(0)
 		, requestedPageFlags(OMRPORT_VMEM_PAGE_FLAG_NOT_USED)
 		, gcmetadataPageSize(0)
