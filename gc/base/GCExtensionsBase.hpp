@@ -1515,7 +1515,7 @@ public:
 		, isArrayletDoubleMapRequested(false)
 		, isArrayletDoubleMapAvailable(false)
 #endif /* defined(OMR_GC_DOUBLE_MAP_ARRAYLETS) */
-		, isVirtualLargeObjectHeapRequested(false)
+		, isVirtualLargeObjectHeapRequested(true)
 		, isVirtualLargeObjectHeapEnabled(false)
 		, requestedPageSize(0)
 		, requestedPageFlags(OMRPORT_VMEM_PAGE_FLAG_NOT_USED)
