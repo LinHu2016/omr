@@ -105,6 +105,7 @@ public:
 	static MM_SparseAddressOrderedFixedSizeDataPool *newInstance(MM_EnvironmentBase *env, void *sparseHeapBase, uintptr_t sparseDataPoolSize);
 	virtual void kill(MM_EnvironmentBase *env);
 
+	J9HashTable *getObjectToSparseDataTable() { return _objectToSparseDataTable; }
 	/**
 	 * Retrieve Object To SparseData Hashtable
 	 *
