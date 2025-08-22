@@ -128,7 +128,7 @@ MM_SparseVirtualMemory::updateSparseDataEntryAfterObjectHasMoved(void *dataPtr, 
 }
 
 void *
-MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size)
+MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size, void *allocationContext)
 {
 	uintptr_t adjustedSize = adjustSize(size);
 
@@ -140,7 +140,7 @@ MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(void *proxyObj
 		/* While the allocate and commit will work with _pageSize aligned memory, the map will contain exact size of the object.
 		 * The size will be verified on updates.
 		 */
-		_sparseDataPool->mapSparseDataPtrToHeapProxyObjectPtr(sparseHeapAddr, proxyObjPtr, size);
+		_sparseDataPool->mapSparseDataPtrToHeapProxyObjectPtr(sparseHeapAddr, proxyObjPtr, size, allocationContext);
 
 		/* Zeroing (if needed at all) is safe to do after monitor release, since object has not been exposed yet. */
 		omrthread_monitor_exit(_largeObjectVirtualMemoryMutex);

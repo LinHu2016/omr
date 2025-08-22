@@ -110,10 +110,11 @@ public:
 	 *
 	 * @param size		uintptr_t	size requested by object pointer to be allocated at sparse heap
 	 * @param proxyObjPtr	void*	Proxy object that will be associated to the data at sparse heap
+	 * @param allocationContext void* own allocation context
 	 *
 	 * @return data pointer at sparse heap that satisfies the requested size
 	 */
-	void *allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size);
+	void *allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size, void *allocationContext = NULL);
 
 	/**
 	 * Once object is collected by GC, we need to free the sparse region associated

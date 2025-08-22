@@ -46,6 +46,7 @@ private:
 public:
 	void *_dataPtr; /**< Object data pointer related to proxy object */
 	void *_proxyObjPtr; /**< Pointer to proxy object that is residing in-heap */
+	void *_allocationContextPtr; /**<  */
 	uintptr_t _size; /**< Total size of the data pointed to by dataPtr */
 
 /*
@@ -56,6 +57,7 @@ public:
 	MM_SparseDataTableEntry()
 		: _dataPtr(NULL)
 		, _proxyObjPtr(NULL)
+		, _allocationContextPtr(NULL)
 		, _size(0)
 	{
 	}
@@ -63,16 +65,27 @@ public:
 	MM_SparseDataTableEntry(void *dataPtr)
 		: _dataPtr(dataPtr)
 		, _proxyObjPtr(NULL)
+		, _allocationContextPtr(NULL)
 		, _size(0)
 	{
 	}
 
-	MM_SparseDataTableEntry(void *dataPtr, void* proxyObjPtr, uintptr_t size)
+	MM_SparseDataTableEntry(void *dataPtr, void *proxyObjPtr, uintptr_t size)
 		: _dataPtr(dataPtr)
 		, _proxyObjPtr(proxyObjPtr)
+		, _allocationContextPtr(NULL)
 		, _size(size)
 	{
 	}
+
+	MM_SparseDataTableEntry(void *dataPtr, void *proxyObjPtr, uintptr_t size, void *allocationContextPtr)
+		: _dataPtr(dataPtr)
+		, _proxyObjPtr(proxyObjPtr)
+		, _allocationContextPtr(allocationContextPtr)
+		, _size(size)
+	{
+	}
+
 };
 
 class MM_SparseAddressOrderedFixedSizeDataPool : public MM_BaseVirtual
@@ -137,10 +150,11 @@ public:
 	 * @param dataPtr		void*		data location pointer
 	 * @param proxyObjPtr	void*		Proxy object associated with dataPtr
 	 * @param size			uintptr_t	Size of region consumed by dataPtr
+	 * @param allocationContext	void*	own allocation context
 	 *
 	 * @return true if object is added successfully to the hash table , false otherwise
 	 */
-	bool mapSparseDataPtrToHeapProxyObjectPtr(void *dataPtr, void *proxyObjPtr, uintptr_t size);
+	bool mapSparseDataPtrToHeapProxyObjectPtr(void *dataPtr, void *proxyObjPtr, uintptr_t size, void *allocationContext = NULL);
 
 	/**
 	 * Remove entry from the hash table that is associated the object data pointer provided.

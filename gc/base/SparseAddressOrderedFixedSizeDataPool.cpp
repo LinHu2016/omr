@@ -129,10 +129,10 @@ MM_SparseAddressOrderedFixedSizeDataPool::kill(MM_EnvironmentBase *env)
 }
 
 bool
-MM_SparseAddressOrderedFixedSizeDataPool::mapSparseDataPtrToHeapProxyObjectPtr(void *dataPtr, void *proxyObjPtr, uintptr_t size)
+MM_SparseAddressOrderedFixedSizeDataPool::mapSparseDataPtrToHeapProxyObjectPtr(void *dataPtr, void *proxyObjPtr, uintptr_t size, void *allocationContext)
 {
 	bool ret = true;
-	MM_SparseDataTableEntry entry = MM_SparseDataTableEntry(dataPtr, proxyObjPtr, size);
+	MM_SparseDataTableEntry entry = MM_SparseDataTableEntry(dataPtr, proxyObjPtr, size, allocationContext);
 	void *result = hashTableAdd(_objectToSparseDataTable, &entry);
 
 	if (NULL == result) {
