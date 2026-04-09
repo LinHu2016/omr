@@ -145,13 +145,20 @@ MM_SparseVirtualMemory::updateSparseDataEntryAfterObjectHasMoved(void *dataPtr, 
 }
 
 void *
-MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size)
+MM_SparseVirtualMemory::allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size, uintptr_t reservedRegionCount)
 {
 	uintptr_t adjustedSize = adjustSize(size);
 
 	omrthread_monitor_enter(_largeObjectVirtualMemoryMutex);
 
 	void *sparseHeapAddr = _sparseDataPool->findFreeListEntry(adjustedSize);
+	if (NULL != sparseHeapAddr) {
+		uintptr_t offset = getAllocationContextIndexForAddress(sparseHeapAddr);
+		if ((offset + reservedRegionCount) > _allocationContextArraySize) {
+			/* offheap address is overflowed */
+			sparseHeapAddr = NULL;
+		}
+	}
 
 	if (NULL != sparseHeapAddr) {
 		/* While the allocate and commit will work with _pageSize aligned memory, the map will contain exact size of the object.

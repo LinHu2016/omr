@@ -117,12 +117,13 @@ public:
 	/**
 	 * Find free space at sparse heap address space that satisfies the given size
 	 *
-	 * @param size		uintptr_t	size requested by object pointer to be allocated at sparse heap
 	 * @param proxyObjPtr	void*	Proxy object that will be associated to the data at sparse heap
+	 * @param size		uintptr_t	size requested by object pointer to be allocated at sparse heap
+	 * @param reservedRegionCount uintptr_t the region count reserved in heap, for checking if offheap address could be overflowed
 	 *
 	 * @return data pointer at sparse heap that satisfies the requested size
 	 */
-	void *allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size);
+	void *allocateSparseFreeEntryAndMapToHeapObject(void *proxyObjPtr, uintptr_t size, uintptr_t reservedRegionCount);
 
 	/**
 	 * Once object is collected by GC, we need to free the sparse region associated
