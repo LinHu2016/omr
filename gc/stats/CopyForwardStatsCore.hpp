@@ -80,6 +80,7 @@ public:
 	uintptr_t _edenEvacuateRegionCount;	/**< Counts the number of Eden regions selected to be evacuated in this copy-forward (only counted globally - unused in per-thread stats) */
 	uintptr_t _nonEdenEvacuateRegionCount;	/**< Counts the number of non-Eden selected to be evacuated in this copy-forward (only counted globally - unused in per-thread stats) */
 	uintptr_t _edenSurvivorRegionCount;	/**< Counts the number of Eden regions allocated for survivor space in this copy-forward (only counted globally - unused in per-thread stats) */
+	uintptr_t _age0SurvivorRegionCount;	/**<  */
 	uintptr_t _nonEdenSurvivorRegionCount;	/**< Counts the number of non-Eden regions allocated (that is, not tail-fill regions) for survivor space in this copy-forward (only counted globally - unused in per-thread stats) */
 
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)
@@ -234,6 +235,7 @@ public:
 		_edenEvacuateRegionCount = 0;
 		_nonEdenEvacuateRegionCount = 0;
 		_edenSurvivorRegionCount = 0;
+		_age0SurvivorRegionCount = 0;
 		_nonEdenSurvivorRegionCount = 0;
 
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)
@@ -366,6 +368,7 @@ public:
 		,_edenEvacuateRegionCount(0)
 		,_nonEdenEvacuateRegionCount(0)
 		,_edenSurvivorRegionCount(0)
+		,_age0SurvivorRegionCount(0)
 		,_nonEdenSurvivorRegionCount(0)
 #if defined(J9MODRON_TGC_PARALLEL_STATISTICS)
 		,_releaseScanListCount(0)
