@@ -70,7 +70,8 @@ public:
 	uintptr_t _localNumaNodeBytes;
 	uintptr_t _nonLocalNumaNodeBytes;
 
-
+	uintptr_t _fragmentedSize; /**< Free bytes (excluding dark matter) in regions that contain objects, i.e. not free, not idle and not arraylet leaf */
+	uintptr_t _fragmentedSizeFromContext;
 private:
 protected:
 public:
@@ -117,6 +118,8 @@ public:
 		,_commonNumaNodeBytes(0)
 		,_localNumaNodeBytes(0)
 		,_nonLocalNumaNodeBytes(0)
+		,_fragmentedSize(0)
+		,_fragmentedSizeFromContext(0)
 	{}
 };
 
